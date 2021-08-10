@@ -19,8 +19,20 @@ export default class FlowInstance extends BaseEntity{
 	@Column({ name: 'flow_id', type: 'numeric', nullable: false })
 	flowId: number;
 
-	@Column({ name: 'event_id', type: 'numeric', nullable: false })
-	eventId: number;
+	@Column({ name: 'data_id', type: 'numeric', nullable: false })
+	dataId: number;
+
+	@Column({ name: 'action_id', type: 'numeric', nullable: false })
+	actionId: number;
+
+	@Column({ name: 'origin_name', type: 'varchar', length: 100 })
+	originName: string;
+
+	@Column({ name: 'status', type: 'varchar', length: 100 })
+  	status: string;
+
+  	@Column({ name: 'origin_key', type: 'varchar', length: 100 })
+  	originKey: string;
 
 	@Column({ name: 'process_number', type: 'varchar', nullable: false, length: 50 })
 	processNumber: string;

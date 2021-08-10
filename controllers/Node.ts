@@ -23,6 +23,13 @@ import {
 @Model('flow-nd/Node')
 class Node extends Controller {
 
+  async getNodeData(node: any, dataId: any, manager: EntityManager) {
+    const {action: {originName, originKey}} = node;
+    const executeView = `select * from ${originName} where ${originKey} = ${dataId}`;
+    const resExecuteView = await __(manager.query(executeView));
+    return JSON.stringify(resExecuteView[0]);
+  }
+
 }
 
 export default Node;

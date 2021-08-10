@@ -12,18 +12,12 @@
  * Created at     : 2021-07-08 12:55:38
  * Last modified  :
  */
-import { EntitySubscriberInterface, EventSubscriber, InsertEvent, RemoveEvent, UpdateEvent } from 'typeorm';
-import { TransactionStartEvent } from 'typeorm/subscriber/event/TransactionStartEvent';
-import { TransactionCommitEvent } from 'typeorm/subscriber/event/TransactionCommitEvent';
-import { TransactionRollbackEvent } from 'typeorm/subscriber/event/TransactionRollbackEvent';
+import { EntitySubscriberInterface, EventSubscriber, InsertEvent, getManager } from 'typeorm';
 import EventModel from '../entity/Event';
-import Flow from '../entity/Flow';
 import Node from '../entity/Node';
 import { __ } from '@pxp-nd/core';
 import FlowInstanceModel from '../entity/FlowInstance';
-import FlowInstance from '../entity/FlowInstance';
 import NodeInstanceController from '../controllers/NodeInstance';
-import NodeConnection from '../entity/NodeConnection';
 
 @EventSubscriber()
 export class Event implements EntitySubscriberInterface<EventModel> {
@@ -35,38 +29,20 @@ export class Event implements EntitySubscriberInterface<EventModel> {
   async afterInsert(event: InsertEvent<EventModel>) {
 
     //todo investigate  replace variables into condition
-
-
     const newEvent = event.entity;
-    const node = await __(Node.find({ where: { actionId: newEvent.actionId } }))
-    //const node = await __(event.manager.find(Node, { where: { actionId: newEvent.actionId } }))
-
-    console.log('afterInsert', newEvent)
-    console.log('node has found', node)
+    const node = await __(Node.find({ where: { actionId: newEvent.actionId } }));
 
     for (const n of node) {
-
       //get data of view
       const {action: {originName, originKey}} = n;
-
-     /* console.log('n',n)
-      console.log('originName',originName)
-      console.log('originKey',originKey)*/
-      const executeView = `select * from ${originName} where ${originKey} = ${newEvent.dataId}`
-      const resExecuteView = await __(event.manager.query(executeView))
-     /* console.log('executeView',executeView)
-      console.log('resExecuteView',resExecuteView)*/
       let flowInstance = new FlowInstanceModel();
       flowInstance.flowId = n.flowId;
-      flowInstance.eventId = newEvent.eventId;
-      flowInstance.processNumber = 'code1';
-      flowInstance.resultFromOrigen = JSON.stringify(resExecuteView[0]);
+      flowInstance.dataId = newEvent.dataId;
+      flowInstance.originName = originName;
+      flowInstance.originKey = originKey;
+      flowInstance.actionId = newEvent.actionId;
+      flowInstance.status = 'pending';
       flowInstance = await event.manager.save(FlowInstanceModel, flowInstance);
-      /*console.log('flowInstance',flowInstance)*/
-
-      const CNodeInstance = new NodeInstanceController('flow-nd');
-      await CNodeInstance.RecursiveInstance({ node:n, flowInstance, resultFromOrigin: resExecuteView[0] }, event.manager);
-
 
     }
   }

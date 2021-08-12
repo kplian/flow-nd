@@ -1,0 +1,25 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.controllers = exports.OriginNameController = exports.NodeInstanceController = exports.NodeController = exports.FlowInstanceController = exports.FlowController = exports.FieldMapController = exports.EventController = exports.ActionTypeController = exports.ActionController = void 0;
+const Action_1 = __importDefault(require("./Action"));
+exports.ActionController = Action_1.default;
+const ActionType_1 = __importDefault(require("./ActionType"));
+exports.ActionTypeController = ActionType_1.default;
+const Event_1 = __importDefault(require("./Event"));
+exports.EventController = Event_1.default;
+const FieldMap_1 = __importDefault(require("./FieldMap"));
+exports.FieldMapController = FieldMap_1.default;
+const Flow_1 = __importDefault(require("./Flow"));
+exports.FlowController = Flow_1.default;
+const FlowInstance_1 = __importDefault(require("./FlowInstance"));
+exports.FlowInstanceController = FlowInstance_1.default;
+const Node_1 = __importDefault(require("./Node"));
+exports.NodeController = Node_1.default;
+const NodeInstance_1 = __importDefault(require("./NodeInstance"));
+exports.NodeInstanceController = NodeInstance_1.default;
+const OriginName_1 = __importDefault(require("./OriginName"));
+exports.OriginNameController = OriginName_1.default;
+exports.controllers = [Action_1.default, ActionType_1.default, Event_1.default, FieldMap_1.default, Flow_1.default, FlowInstance_1.default, Node_1.default, NodeInstance_1.default, OriginName_1.default];

@@ -1,0 +1,29 @@
+{
+    "compilerOptions": {
+      "target": "es2017",
+      "module": "commonjs",
+      "allowJs": false,
+      "outDir": "dist",
+      "rootDir": "src",
+      "strict": false,
+      "noImplicitAny": true,
+      "esModuleInterop": true,
+      "resolveJsonModule": true,
+      "skipLibCheck": true,
+      "forceConsistentCasingInFileNames": true,
+      "emitDecoratorMetadata": true,
+      "experimentalDecorators": true,
+      "moduleResolution": "node",
+      "declaration": true,
+      "isolatedModules": true,
+      "strictPropertyInitialization": false,
+    },
+    "include": [
+      "custom.d.ts",
+      "src/**/*.ts"
+    ],
+    "exclude": [
+      "node_modules",
+      "dist"
+    ]
+  }

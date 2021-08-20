@@ -41,7 +41,7 @@ class FlowInstance extends Controller {
       }
       flag.value = 'true';
       let flowInstanceIdProcessing = -1;
-      getManager().save(flag);
+      await getManager().save(flag);
       try {
           const maxFlows = await GlobalData.findOne({ data : 'wf_max_concurrent_flows_process'});
           const flowInstances = await FlowInstanceModel.find({ take: (maxFlows && maxFlows.value) as unknown as number, where: [{ status: 'pending' }], order: { flowInstanceId: "ASC" }});

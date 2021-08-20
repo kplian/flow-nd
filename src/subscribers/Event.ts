@@ -12,9 +12,10 @@
  * Created at     : 2021-07-08 12:55:38
  * Last modified  :
  */
-import { EntitySubscriberInterface, EventSubscriber, InsertEvent } from 'typeorm';
+import { EntitySubscriberInterface, EventSubscriber, InsertEvent, getManager } from 'typeorm';
 import EventModel from '../entity/Event';
 import Node from '../entity/Node';
+import Flow from '../entity/Flow';
 import { __ } from '@pxp-nd/core';
 import FlowInstanceModel from '../entity/FlowInstance';
 
@@ -32,17 +33,23 @@ export class Event implements EntitySubscriberInterface<EventModel> {
     const newEvent = event.entity;
     const node = await __(Node.find({ where: { actionId: newEvent.actionId } }));
 
+
     for (const n of node) {
       //get data of view
       const {action: {originName, originKey}} = n;
-      let flowInstance = new FlowInstanceModel();
-      flowInstance.flowId = n.flowId;
-      flowInstance.dataId = newEvent.dataId;
-      flowInstance.originName = originName;
-      flowInstance.originKey = originKey;
-      flowInstance.actionId = newEvent.actionId;
-      flowInstance.status = 'pending';
-      flowInstance = await event.manager.save(FlowInstanceModel, flowInstance);
+      const executeView = `select * from ${originName} where ${originKey} = ${newEvent.dataId}`;
+      const resExecuteView = await getManager().query(executeView);
+      const flow = await __(Flow.findOne({ where: { flowId: n.flowId } }));
+      if (flow.vendorId == resExecuteView[0].vendor_id) {
+        let flowInstance = new FlowInstanceModel();
+        flowInstance.flowId = n.flowId;
+        flowInstance.dataId = newEvent.dataId;
+        flowInstance.originName = originName;
+        flowInstance.originKey = originKey;
+        flowInstance.actionId = newEvent.actionId;
+        flowInstance.status = 'pending';
+        flowInstance = await event.manager.save(FlowInstanceModel, flowInstance);
+      }
 
     }
   }

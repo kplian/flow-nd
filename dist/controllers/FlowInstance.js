@@ -42,7 +42,7 @@ class FlowInstance extends core_1.Controller {
             }
             flag.value = 'true';
             let flowInstanceIdProcessing = -1;
-            typeorm_1.getManager().save(flag);
+            await typeorm_1.getManager().save(flag);
             try {
                 const maxFlows = await common_1.GlobalData.findOne({ data: 'wf_max_concurrent_flows_process' });
                 const flowInstances = await FlowInstance_1.default.find({ take: (maxFlows && maxFlows.value), where: [{ status: 'pending' }], order: { flowInstanceId: "ASC" } });

@@ -15,5 +15,6 @@ import { EntityManager } from 'typeorm';
 import { Controller } from '@pxp-nd/core';
 declare class Node extends Controller {
     getNodeData(node: any, dataId: any, manager: EntityManager): Promise<string>;
+    add(params: Record<string, any>, manager: EntityManager): Promise<unknown>;
 }
 export default Node;

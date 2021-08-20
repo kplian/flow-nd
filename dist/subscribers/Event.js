@@ -27,6 +27,7 @@ exports.Event = void 0;
 const typeorm_1 = require("typeorm");
 const Event_1 = __importDefault(require("../entity/Event"));
 const Node_1 = __importDefault(require("../entity/Node"));
+const Flow_1 = __importDefault(require("../entity/Flow"));
 const core_1 = require("@pxp-nd/core");
 const FlowInstance_1 = __importDefault(require("../entity/FlowInstance"));
 let Event = class Event {
@@ -41,14 +42,19 @@ let Event = class Event {
         for (const n of node) {
             //get data of view
             const { action: { originName, originKey } } = n;
-            let flowInstance = new FlowInstance_1.default();
-            flowInstance.flowId = n.flowId;
-            flowInstance.dataId = newEvent.dataId;
-            flowInstance.originName = originName;
-            flowInstance.originKey = originKey;
-            flowInstance.actionId = newEvent.actionId;
-            flowInstance.status = 'pending';
-            flowInstance = await event.manager.save(FlowInstance_1.default, flowInstance);
+            const executeView = `select * from ${originName} where ${originKey} = ${newEvent.dataId}`;
+            const resExecuteView = await typeorm_1.getManager().query(executeView);
+            const flow = await core_1.__(Flow_1.default.findOne({ where: { flowId: n.flowId } }));
+            if (flow.vendorId == resExecuteView[0].vendor_id) {
+                let flowInstance = new FlowInstance_1.default();
+                flowInstance.flowId = n.flowId;
+                flowInstance.dataId = newEvent.dataId;
+                flowInstance.originName = originName;
+                flowInstance.originKey = originKey;
+                flowInstance.actionId = newEvent.actionId;
+                flowInstance.status = 'pending';
+                flowInstance = await event.manager.save(FlowInstance_1.default, flowInstance);
+            }
         }
     }
 };

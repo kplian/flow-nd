@@ -127,7 +127,7 @@ class NodeInstance extends Controller {
         throw new PxpError(400, 'Already processing pending flows');
       }
       flag.value = 'true';
-      getManager().save(flag);
+      await getManager().save(flag);
       let nodeInstanceIdProcessing = -1;
       try {
         const maxNodes = await GlobalData.findOne({ data : 'wf_max_concurrent_delay_process'});
@@ -169,11 +169,11 @@ class NodeInstance extends Controller {
         }
       } catch(error) {
         flag.value = 'false';
-        getManager().save(flag);
+        await getManager().save(flag);
         throw new PxpError(400, 'Error processing node: ' + nodeInstanceIdProcessing);
       }
       flag.value = 'false';
-      getManager().save(flag);
+      await getManager().save(flag);
     }
     return { success: true }
   }

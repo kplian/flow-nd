@@ -13,5 +13,6 @@
  */
 import { Controller } from '@pxp-nd/core';
 declare class Flow extends Controller {
+    get(params: Record<string, any>): Promise<unknown>;
 }
 export default Flow;

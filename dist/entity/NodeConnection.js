@@ -14,7 +14,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const typeorm_1 = require("typeorm");
 const Node_1 = __importDefault(require("./Node"));
-let NodeConnection = class NodeConnection extends typeorm_1.BaseEntity {
+const common_1 = require("@pxp-nd/common");
+let NodeConnection = class NodeConnection extends common_1.PxpEntity {
 };
 __decorate([
     typeorm_1.PrimaryGeneratedColumn({ name: 'node_connection_id' }),

@@ -4,10 +4,10 @@
  *
  * MIT
  *
- * Member Controller
+ * Flow Controller
  *
- * @summary Member Controller
- * @author Favio Figueroa
+ * @summary Flow Controller
+ * @author Jaime Figueroa
  *
  * Created at     : 2021-07-08 12:55:38
  * Last modified  :
@@ -40,9 +40,9 @@ let Flow = class Flow extends core_1.Controller {
     }
 };
 __decorate([
-    core_1.Post(),
+    core_1.Get(),
     core_1.DbSettings('Orm'),
-    core_1.ReadOnly(false),
+    core_1.ReadOnly(true),
     core_1.Log(true),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),

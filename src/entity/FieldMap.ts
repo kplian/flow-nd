@@ -8,9 +8,10 @@ import {
     JoinColumn
   } from 'typeorm';
   import OriginName from './OriginName';
+import { PxpEntity } from '@pxp-nd/common';
 
   @Entity({ name: 'twf_field_map' })
-  export default class FieldMap extends BaseEntity{
+  export default class FieldMap extends PxpEntity{
 
     @PrimaryGeneratedColumn({ name: 'field_map_id' })
     fieldMapId: number;

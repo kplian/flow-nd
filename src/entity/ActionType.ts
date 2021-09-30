@@ -8,9 +8,10 @@ import {
   Column
 } from 'typeorm';
 import Action from './Action';
+import { PxpEntity } from '@pxp-nd/common';
 
 @Entity({ name: 'twf_action_type' })
-export default class ActionType extends BaseEntity{
+export default class ActionType extends PxpEntity{
 
   @PrimaryGeneratedColumn({ name: 'action_type_id' })
   actionTypeId: number;

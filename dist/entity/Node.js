@@ -17,7 +17,8 @@ const Action_1 = __importDefault(require("./Action"));
 const NodeConnection_1 = __importDefault(require("./NodeConnection"));
 const NodeInstance_1 = __importDefault(require("./NodeInstance"));
 const Flow_1 = __importDefault(require("./Flow"));
-let Node = class Node extends typeorm_1.BaseEntity {
+const common_1 = require("@pxp-nd/common");
+let Node = class Node extends common_1.PxpEntity {
 };
 __decorate([
     typeorm_1.PrimaryGeneratedColumn({ name: 'node_id' }),

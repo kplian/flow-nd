@@ -1,6 +1,6 @@
-import { BaseEntity } from 'typeorm';
 import Action from './Action';
-export default class Event extends BaseEntity {
+import { PxpEntity } from '@pxp-nd/common';
+export default class Event extends PxpEntity {
     eventId: number;
     actionId: number;
     descJobName: string;

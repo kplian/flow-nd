@@ -1,6 +1,6 @@
-import { BaseEntity } from 'typeorm';
 import Node from './Node';
-export default class NodeConnection extends BaseEntity {
+import { PxpEntity } from '@pxp-nd/common';
+export default class NodeConnection extends PxpEntity {
     nodeConnectionId: number;
     condition: string;
     nodeIdMaster: number;

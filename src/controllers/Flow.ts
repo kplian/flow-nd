@@ -3,10 +3,10 @@
  *
  * MIT
  *
- * Member Controller
+ * Flow Controller
  *
- * @summary Member Controller
- * @author Favio Figueroa
+ * @summary Flow Controller
+ * @author Jaime Figueroa
  *
  * Created at     : 2021-07-08 12:55:38
  * Last modified  :
@@ -24,9 +24,9 @@ import NodeConnectionModel from '../entity/NodeConnection';
 @Model('flow-nd/Flow')
 class Flow extends Controller {
 
-  @Post()
+  @Get()
   @DbSettings('Orm')
-  @ReadOnly(false)
+  @ReadOnly(true)
   @Log(true)
   async get(params: Record<string, any>): Promise<unknown> {
     const nodes = await NodeModel.find({ flowId: params.flowId });

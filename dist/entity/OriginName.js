@@ -14,7 +14,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const typeorm_1 = require("typeorm");
 const FieldMap_1 = __importDefault(require("./FieldMap"));
-let OriginName = class OriginName extends typeorm_1.BaseEntity {
+const common_1 = require("@pxp-nd/common");
+let OriginName = class OriginName extends common_1.PxpEntity {
 };
 __decorate([
     typeorm_1.PrimaryGeneratedColumn({ name: 'origin_name_id' }),

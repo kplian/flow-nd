@@ -9,9 +9,10 @@ import {
 } from 'typeorm';
 import NodeInstance from './NodeInstance';
 import Flow from './Flow';
+import { PxpEntity } from '@pxp-nd/common';
 
 @Entity({ name: 'twf_flow_instance' })
-export default class FlowInstance extends BaseEntity{
+export default class FlowInstance extends PxpEntity{
 
 	@PrimaryGeneratedColumn({ name: 'flow_instance_id' })
 	flowInstanceId: number;

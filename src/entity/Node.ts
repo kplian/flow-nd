@@ -11,9 +11,10 @@ import Action from './Action';
 import NodeConnection from './NodeConnection';
 import NodeInstance from './NodeInstance';
 import Flow from './Flow';
+import { PxpEntity } from '@pxp-nd/common';
 
 @Entity({ name: 'twf_node' })
-export default class Node extends BaseEntity {
+export default class Node extends PxpEntity {
 
   @PrimaryGeneratedColumn({ name: 'node_id' })
   nodeId: number;
@@ -65,7 +66,7 @@ export default class Node extends BaseEntity {
   childConnections: NodeConnection[];
 
 
-  @OneToMany(() => NodeInstance, (nodeInstance) => nodeInstance.nodes)
+  @OneToMany(() => NodeInstance, (nodeInstance) => nodeInstance.node)
   nodeInstances: NodeInstance[];
 
 }

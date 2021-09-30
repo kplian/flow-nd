@@ -1,7 +1,7 @@
-import { BaseEntity } from 'typeorm';
 import ActionType from './ActionType';
 import Node from './Node';
-export default class Action extends BaseEntity {
+import { PxpEntity } from '@pxp-nd/common';
+export default class Action extends PxpEntity {
     actionId: number;
     actionTypeId: number;
     code: string;

@@ -9,9 +9,10 @@ import {
 } from 'typeorm';
 import FlowInstance from './FlowInstance';
 import Node from './Node';
+import { PxpEntity } from '@pxp-nd/common';
 
 @Entity({ name: 'twf_node_instance' })
-export default class NodeInstance extends BaseEntity{
+export default class NodeInstance extends PxpEntity{
 
 
   @PrimaryGeneratedColumn({ name: 'node_instance_id' })
@@ -38,7 +39,7 @@ export default class NodeInstance extends BaseEntity{
 
   @ManyToOne(() => Node, node => node.nodeInstances, {eager: true})
   @JoinColumn({ name: 'node_id' })
-  nodes: Node;
+  node: Node;
 
 
 }

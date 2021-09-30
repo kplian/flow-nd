@@ -1,7 +1,7 @@
-import { BaseEntity } from 'typeorm';
 import FlowInstance from './FlowInstance';
 import Node from './Node';
-export default class Flow extends BaseEntity {
+import { PxpEntity } from '@pxp-nd/common';
+export default class Flow extends PxpEntity {
     flowId: number;
     vendorId: number;
     code: number;

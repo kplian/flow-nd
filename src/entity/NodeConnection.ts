@@ -8,9 +8,10 @@ import {
 	Column
 } from 'typeorm';
 import Node from './Node';
+import { PxpEntity } from '@pxp-nd/common';
 
 @Entity({ name: 'twf_node_connection' })
-export default class NodeConnection extends BaseEntity{
+export default class NodeConnection extends PxpEntity{
 
 	@PrimaryGeneratedColumn({ name: 'node_connection_id' })
 	nodeConnectionId: number;

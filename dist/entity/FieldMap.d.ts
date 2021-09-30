@@ -1,6 +1,6 @@
-import { BaseEntity } from 'typeorm';
 import OriginName from './OriginName';
-export default class FieldMap extends BaseEntity {
+import { PxpEntity } from '@pxp-nd/common';
+export default class FieldMap extends PxpEntity {
     fieldMapId: number;
     name: string;
     alias: string;

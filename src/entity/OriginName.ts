@@ -6,9 +6,10 @@ import {
   Column
 } from 'typeorm';
 import FieldMap from './FieldMap';
+import { PxpEntity } from '@pxp-nd/common';
 
 @Entity({ name: 'twf_origin_name' })
-export default class OriginName extends BaseEntity{
+export default class OriginName extends PxpEntity{
 
   @PrimaryGeneratedColumn({ name: 'origin_name_id' })
   originNameId: number;

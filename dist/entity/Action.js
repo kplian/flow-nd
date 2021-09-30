@@ -15,7 +15,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const typeorm_1 = require("typeorm");
 const ActionType_1 = __importDefault(require("./ActionType"));
 const Node_1 = __importDefault(require("./Node"));
-let Action = class Action extends typeorm_1.BaseEntity {
+const common_1 = require("@pxp-nd/common");
+let Action = class Action extends common_1.PxpEntity {
 };
 __decorate([
     typeorm_1.PrimaryGeneratedColumn({ name: 'action_id' }),

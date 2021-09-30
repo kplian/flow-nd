@@ -15,7 +15,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const typeorm_1 = require("typeorm");
 const FlowInstance_1 = __importDefault(require("./FlowInstance"));
 const Node_1 = __importDefault(require("./Node"));
-let NodeInstance = class NodeInstance extends typeorm_1.BaseEntity {
+const common_1 = require("@pxp-nd/common");
+let NodeInstance = class NodeInstance extends common_1.PxpEntity {
 };
 __decorate([
     typeorm_1.PrimaryGeneratedColumn({ name: 'node_instance_id' }),

@@ -84,7 +84,7 @@ __decorate([
     __metadata("design:type", Array)
 ], Node.prototype, "childConnections", void 0);
 __decorate([
-    typeorm_1.OneToMany(() => NodeInstance_1.default, (nodeInstance) => nodeInstance.nodes),
+    typeorm_1.OneToMany(() => NodeInstance_1.default, (nodeInstance) => nodeInstance.node),
     __metadata("design:type", Array)
 ], Node.prototype, "nodeInstances", void 0);
 Node = __decorate([

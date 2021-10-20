@@ -9,5 +9,5 @@ export default class NodeInstance extends PxpEntity {
     schedule: Date;
     status: string;
     flowInstance: FlowInstance;
-    nodes: Node;
+    node: Node;
 }

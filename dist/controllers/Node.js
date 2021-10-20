@@ -21,6 +21,17 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -29,6 +40,8 @@ const typeorm_1 = require("typeorm");
 const Node_1 = __importDefault(require("../entity/Node"));
 const NodeConnection_1 = __importDefault(require("../entity/NodeConnection"));
 const core_1 = require("@pxp-nd/core");
+const FieldMap_1 = __importDefault(require("../entity/FieldMap"));
+const OriginName_1 = __importDefault(require("../entity/OriginName"));
 let Node = class Node extends core_1.Controller {
     async getNodeData(node, dataId, manager) {
         const { action: { originName, originKey } } = node;
@@ -57,7 +70,82 @@ let Node = class Node extends core_1.Controller {
                 nodeConnection = await manager.save(nodeConnection);
             }
         }
-        return node;
+        const { nodeId } = node;
+        const nodeData = await manager.findOne(Node_1.default, nodeId);
+        return nodeData;
+    }
+    async AddActionConfigJson(params, manager) {
+        console.log('params', params);
+        let { nodeId: removed, __metadata: removed2 } = params, actionConfigJson = __rest(params, ["nodeId", "__metadata"]);
+        Object.entries(params.__metadata).forEach(([nameKey, values]) => {
+            actionConfigJson[nameKey] = `{{ ${values.name} }}`;
+        });
+        console.log('actionConfigJson', actionConfigJson);
+        const upd = await core_1.__(manager.update(Node_1.default, params.nodeId, {
+            actionConfigJson: JSON.stringify(actionConfigJson),
+        }));
+        return {
+            actionConfigJson,
+            success: true,
+            nodeId: params.nodeId,
+            upd
+        };
+    }
+    async getParameterizedNode(params, manager) {
+        const { nodeId, flowId } = params;
+        /*const tNodeOrigin =  __(NodeModel.find({
+          relations: ['action'],
+          where: {
+            flowId: flowId,
+            action: {
+              originName: Not(IsNull())
+            }
+          }
+        }));*/
+        const tNodeData = core_1.__(Node_1.default.findOne(nodeId));
+        const tFieldMapData = core_1.__(manager.createQueryBuilder(FieldMap_1.default, 'fm')
+            .innerJoin(OriginName_1.default, 'on', 'on.originNameId = fm.originNameId')
+            .where("on.name = :n ", { n: 'v_member' })
+            .getMany());
+        //const nodeOrigin = await tNodeOrigin; todo
+        const nodeData = await tNodeData;
+        const fieldMapData = await tFieldMapData;
+        /*const [nodeData, fieldMapData] = await Promise.all([
+          tNodeData,
+          tFieldMapData
+        ]);*/
+        const { actionConfigJson, action: { configJsonTemplate, actionType: { schemaJson } } } = nodeData;
+        const actionConfigJsonObject = actionConfigJson ? JSON.parse(actionConfigJson) : {};
+        const configJsonTemplateObject = configJsonTemplate ? JSON.parse(configJsonTemplate) : {};
+        let schemaJsonObject = schemaJson ? JSON.parse(schemaJson) : {};
+        const mergeValues = Object.assign(Object.assign({}, configJsonTemplateObject), actionConfigJsonObject);
+        const verifyIfValueFromFieldMap = (str) => {
+            if (/^{{/.test(str) && /}}$/.test(str)) {
+                return true;
+            }
+            return false;
+        };
+        const findFieldMapAndMetaData = (value) => {
+            const found = fieldMapData.find((fmd) => `{{ ${fmd.name} }}` === value) || {};
+            return {
+                initialValue: found.alias || value,
+                metadata: found
+            };
+        };
+        Object.entries(mergeValues).forEach(([nameKey, value]) => {
+            if (schemaJsonObject[nameKey]) {
+                schemaJsonObject[nameKey] = Object.assign(Object.assign(Object.assign({}, schemaJsonObject[nameKey]), { initialValue: value }), (verifyIfValueFromFieldMap(value) && Object.assign({ fromFieldMap: true }, findFieldMapAndMetaData(value))));
+            }
+        });
+        return {
+            actionConfigJsonObject,
+            configJsonTemplateObject,
+            mergeValues,
+            schemaJsonObject,
+            schemaJson,
+            node: nodeData,
+            fieldMapData,
+        };
     }
 };
 __decorate([
@@ -69,6 +157,24 @@ __decorate([
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
 ], Node.prototype, "add", null);
+__decorate([
+    core_1.Post(),
+    core_1.DbSettings('Orm'),
+    core_1.ReadOnly(false),
+    core_1.Log(true),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
+    __metadata("design:returntype", Promise)
+], Node.prototype, "AddActionConfigJson", null);
+__decorate([
+    core_1.Get(),
+    core_1.DbSettings('Orm'),
+    core_1.ReadOnly(false),
+    core_1.Log(true),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
+    __metadata("design:returntype", Promise)
+], Node.prototype, "getParameterizedNode", null);
 Node = __decorate([
     core_1.Model('flow-nd/Node')
 ], Node);

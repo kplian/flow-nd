@@ -21,17 +21,6 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var __rest = (this && this.__rest) || function (s, e) {
-    var t = {};
-    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
-        t[p] = s[p];
-    if (s != null && typeof Object.getOwnPropertySymbols === "function")
-        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
-            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
-                t[p[i]] = s[p[i]];
-        }
-    return t;
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -76,7 +65,7 @@ let Node = class Node extends core_1.Controller {
     }
     async AddActionConfigJson(params, manager) {
         console.log('params', params);
-        let { nodeId: removed, __metadata: removed2 } = params, actionConfigJson = __rest(params, ["nodeId", "__metadata"]);
+        let { nodeId: removed, __metadata: removed2, ...actionConfigJson } = params;
         Object.entries(params.__metadata).forEach(([nameKey, values]) => {
             actionConfigJson[nameKey] = `{{ ${values.name} }}`;
         });
@@ -118,7 +107,10 @@ let Node = class Node extends core_1.Controller {
         const actionConfigJsonObject = actionConfigJson ? JSON.parse(actionConfigJson) : {};
         const configJsonTemplateObject = configJsonTemplate ? JSON.parse(configJsonTemplate) : {};
         let schemaJsonObject = schemaJson ? JSON.parse(schemaJson) : {};
-        const mergeValues = Object.assign(Object.assign({}, configJsonTemplateObject), actionConfigJsonObject);
+        const mergeValues = {
+            ...configJsonTemplateObject,
+            ...actionConfigJsonObject
+        };
         const verifyIfValueFromFieldMap = (str) => {
             if (/^{{/.test(str) && /}}$/.test(str)) {
                 return true;
@@ -134,7 +126,11 @@ let Node = class Node extends core_1.Controller {
         };
         Object.entries(mergeValues).forEach(([nameKey, value]) => {
             if (schemaJsonObject[nameKey]) {
-                schemaJsonObject[nameKey] = Object.assign(Object.assign(Object.assign({}, schemaJsonObject[nameKey]), { initialValue: value }), (verifyIfValueFromFieldMap(value) && Object.assign({ fromFieldMap: true }, findFieldMapAndMetaData(value))));
+                schemaJsonObject[nameKey] = {
+                    ...schemaJsonObject[nameKey],
+                    initialValue: value,
+                    ...(verifyIfValueFromFieldMap(value) && { fromFieldMap: true, ...findFieldMapAndMetaData(value) }),
+                };
             }
         });
         return {
@@ -145,6 +141,26 @@ let Node = class Node extends core_1.Controller {
             schemaJson,
             node: nodeData,
             fieldMapData,
+        };
+    }
+    async executeActionJson(params, manager) {
+        console.log('params', params);
+        const { nodeId, originName, originKey, fromValues } = params;
+        // we need to get the value from merge values with originKey
+        const getParameterizedNodeData = await core_1.__(this.getParameterizedNode({ nodeId: nodeId }, manager));
+        const { mergeValues } = getParameterizedNodeData;
+        const findOriginValue = Object.entries(mergeValues).find(([nameValue]) => fromValues === nameValue);
+        const resValueObject = Object.fromEntries([findOriginValue]);
+        const originValue = resValueObject[fromValues];
+        const executeViewString = `select * from ${originName} where ${originKey} = ${originValue}`;
+        const resExecuteView = await typeorm_1.getManager().query(executeViewString);
+        console.log('mergeValues', mergeValues);
+        console.log('findOriginValue', findOriginValue);
+        console.log('executeViewString', executeViewString);
+        /*const executeView = `select * from ${originName} where ${originKey} = ${newEvent.dataId}`;
+        const resExecuteView = await getManager().query(executeView);*/
+        return {
+            ...resExecuteView[0]
         };
     }
 };
@@ -175,6 +191,15 @@ __decorate([
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
 ], Node.prototype, "getParameterizedNode", null);
+__decorate([
+    core_1.Post(),
+    core_1.DbSettings('Orm'),
+    core_1.ReadOnly(false),
+    core_1.Log(true),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
+    __metadata("design:returntype", Promise)
+], Node.prototype, "executeActionJson", null);
 Node = __decorate([
     core_1.Model('flow-nd/Node')
 ], Node);

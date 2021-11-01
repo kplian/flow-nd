@@ -43,6 +43,9 @@ export default class ActionType extends PxpEntity{
   @Column({ name: 'extra_schema_json', type: 'text' })
   extraSchemaJson: string;
 
+  @Column({ name: 'actions_json', type: 'text' })
+  actionsJson: string;
+
   @OneToMany(() => Action, (action) => action.actionType)
   actions: Action[];
 }

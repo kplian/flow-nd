@@ -48,9 +48,12 @@ let Action = class Action extends core_1.Controller {
           );*/
         const actionsFind = await Action_1.default.find({
             relations: ['actionType'],
-            where: Object.assign(Object.assign({}, (actionTypeName ? { actionType: {
-                    name: actionTypeName
-                } } : {})), (actionId ? { actionId: actionId } : {}))
+            where: {
+                ...(actionTypeName ? { actionType: {
+                        name: actionTypeName
+                    } } : {}),
+                ...(actionId ? { actionId: actionId } : {}),
+            }
         });
         return { data: actionsFind };
     }

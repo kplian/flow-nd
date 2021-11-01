@@ -53,7 +53,11 @@ let NodeInstance = class NodeInstance extends core_1.Controller {
         if (configJsonTemplate !== '' || actionConfigJson !== '') {
             const actionConfigJsonObject = actionConfigJson && JSON.parse(lodash_1.default.template(actionConfigJson)(resultFromOrigin));
             const configJsonTemplateObject = configJsonTemplate && JSON.parse(lodash_1.default.template(configJsonTemplate)(resultFromOrigin));
-            mergeJson = Object.assign(Object.assign(Object.assign({}, (configJsonTemplateObject || {})), (actionConfigJsonObject || {})), { __resultFromOrigin: resultFromOrigin });
+            mergeJson = {
+                ...(configJsonTemplateObject || {}),
+                ...(actionConfigJsonObject || {}),
+                __resultFromOrigin: resultFromOrigin
+            };
         }
         let nodeInstance = new NodeInstance_1.default();
         nodeInstance.flowInstanceId = flowInstance.flowInstanceId;

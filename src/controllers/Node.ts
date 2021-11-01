@@ -165,6 +165,34 @@ class Node extends Controller {
     };
   }
 
+  @Post()
+  @DbSettings('Orm')
+  @ReadOnly(false)
+  @Log(true)
+  async executeActionJson(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+    console.log('params', params)
+    const {nodeId, originName, originKey, fromValues} = params;
+    // we need to get the value from merge values with originKey
+    const getParameterizedNodeData = await __(this.getParameterizedNode({nodeId: nodeId }, manager));
+
+    const { mergeValues } = getParameterizedNodeData;
+    const findOriginValue = Object.entries(mergeValues).find(([nameValue]) => fromValues === nameValue);
+
+    const resValueObject = Object.fromEntries([findOriginValue]);
+    const originValue = resValueObject[fromValues];
+    const executeViewString = `select * from ${originName} where ${originKey} = ${originValue}`;
+    const resExecuteView = await getManager().query(executeViewString);
+
+    console.log('mergeValues',mergeValues)
+    console.log('findOriginValue',findOriginValue)
+    console.log('executeViewString',executeViewString)
+    /*const executeView = `select * from ${originName} where ${originKey} = ${newEvent.dataId}`;
+    const resExecuteView = await getManager().query(executeView);*/
+    return {
+      ...resExecuteView[0]
+    }
+  }
+
 }
 
 export default Node;

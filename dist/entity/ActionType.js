@@ -58,6 +58,10 @@ __decorate([
     __metadata("design:type", String)
 ], ActionType.prototype, "extraSchemaJson", void 0);
 __decorate([
+    typeorm_1.Column({ name: 'actions_json', type: 'text' }),
+    __metadata("design:type", String)
+], ActionType.prototype, "actionsJson", void 0);
+__decorate([
     typeorm_1.OneToMany(() => Action_1.default, (action) => action.actionType),
     __metadata("design:type", Array)
 ], ActionType.prototype, "actions", void 0);

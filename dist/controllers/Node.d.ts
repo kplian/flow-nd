@@ -18,5 +18,6 @@ declare class Node extends Controller {
     add(params: Record<string, any>, manager: EntityManager): Promise<unknown>;
     AddActionConfigJson(params: Record<string, any>, manager: EntityManager): Promise<unknown>;
     getParameterizedNode(params: Record<string, any>, manager: EntityManager): Promise<unknown>;
+    executeActionJson(params: Record<string, any>, manager: EntityManager): Promise<unknown>;
 }
 export default Node;

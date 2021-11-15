@@ -142,7 +142,6 @@ class NodeInstance extends Controller {
           .getMany()
         );
 
-        console.log('nodeInstanceDelayData',nodeInstanceDelayData)
         for(const nodeInstance of nodeInstanceDelayData) {
           //update status from wait to executing
           await __(manager.update(NodeInstanceModel, nodeInstance.nodeInstanceId, {

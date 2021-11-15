@@ -74,12 +74,10 @@ class Node extends Controller {
   @ReadOnly(false)
   @Log(true)
   async AddActionConfigJson(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
-    console.log('params', params)
     let { nodeId: removed, __metadata: removed2, ...actionConfigJson } = params;
     Object.entries(params.__metadata).forEach(([nameKey, values]: [nameKey: string, values:any]) => {
       actionConfigJson[nameKey] = `{{ ${values.name} }}`
     });
-    console.log('actionConfigJson',actionConfigJson)
     const upd = await __(manager.update(NodeModel, params.nodeId, {
       actionConfigJson: JSON.stringify(actionConfigJson),
     }));
@@ -170,7 +168,6 @@ class Node extends Controller {
   @ReadOnly(false)
   @Log(true)
   async executeActionJson(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
-    console.log('params', params)
     const {nodeId, originName, originKey, fromValues} = params;
     // we need to get the value from merge values with originKey
     const getParameterizedNodeData = await __(this.getParameterizedNode({nodeId: nodeId }, manager));
@@ -183,9 +180,6 @@ class Node extends Controller {
     const executeViewString = `select * from ${originName} where ${originKey} = ${originValue}`;
     const resExecuteView = await getManager().query(executeViewString);
 
-    console.log('mergeValues',mergeValues)
-    console.log('findOriginValue',findOriginValue)
-    console.log('executeViewString',executeViewString)
     /*const executeView = `select * from ${originName} where ${originKey} = ${newEvent.dataId}`;
     const resExecuteView = await getManager().query(executeView);*/
     return {

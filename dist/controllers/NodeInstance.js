@@ -120,7 +120,6 @@ let NodeInstance = class NodeInstance extends core_1.Controller {
                     .andWhere("ni.status = 'WAIT' ")
                     .limit((maxNodes && maxNodes.value))
                     .getMany());
-                console.log('nodeInstanceDelayData', nodeInstanceDelayData);
                 for (const nodeInstance of nodeInstanceDelayData) {
                     //update status from wait to executing
                     await core_1.__(manager.update(NodeInstance_1.default, nodeInstance.nodeInstanceId, {

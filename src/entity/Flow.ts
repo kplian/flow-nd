@@ -26,6 +26,9 @@ export default class Flow extends PxpEntity{
 	@Column({ type: 'varchar', nullable: false, length: 100 })
 	name: string;
 
+	@Column({ type: 'text', nullable: false })
+	description: string;
+
 	@Column({ type: 'varchar', nullable: false, length: 100 })
 	enabled: string;
 

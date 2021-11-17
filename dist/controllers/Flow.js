@@ -42,21 +42,17 @@ let Flow = class Flow extends core_1.Controller {
     }
     async copyNodeConnections(nodeId, newNodeId, newFlowId, manager) {
         const connections = await core_1.__(NodeConnection_1.default.find({ nodeIdMaster: nodeId }));
-        console.log('copyNodeConnections', nodeId, connections);
         for (let connection of connections) {
             const newNodeConnection = new NodeConnection_1.default();
             const { nodeConnectionId, nodeIdMaster, nodeIdChild, createdAt, modifiedAt, ...nodeConnectionToCopy } = connection;
             // get node from nodeIdChild
             const dataNodeChild = await Node_1.default.findOne({ nodeId: connection.nodeIdChild });
-            console.log('dataNodeChild', dataNodeChild);
             const { nodeId: newNodeIdChild } = await this.copyNode(dataNodeChild, newFlowId, manager);
             Object.assign(newNodeConnection, { ...nodeConnectionToCopy, nodeIdMaster: newNodeId, nodeIdChild: newNodeIdChild });
             const insertNewNodeConnection = await core_1.__(manager.save(NodeConnection_1.default, newNodeConnection));
         }
     }
     async copyNode(node, newFlowId, manager) {
-        console.log('copyNode   ', node);
-        console.log('copyNode   ', node.nodeId);
         // insert new node
         const newNode = new Node_1.default();
         const { nodeId, flowId, createdAt, modifiedAt, actionConfigJson, ...nodeToCopy } = node;
@@ -73,6 +69,7 @@ let Flow = class Flow extends core_1.Controller {
         const newFlow = new Flow_1.default();
         Object.assign(newFlow, flowToCopy);
         newFlow.name = params.name;
+        newFlow.description = params.description;
         const insertNewFlow = await core_1.__(manager.save(Flow_1.default, newFlow));
         // create the nodes
         // get the first node "the trigger node"

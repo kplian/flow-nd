@@ -64,12 +64,10 @@ let Node = class Node extends core_1.Controller {
         return nodeData;
     }
     async AddActionConfigJson(params, manager) {
-        console.log('params', params);
         let { nodeId: removed, __metadata: removed2, ...actionConfigJson } = params;
         Object.entries(params.__metadata).forEach(([nameKey, values]) => {
             actionConfigJson[nameKey] = `{{ ${values.name} }}`;
         });
-        console.log('actionConfigJson', actionConfigJson);
         const upd = await core_1.__(manager.update(Node_1.default, params.nodeId, {
             actionConfigJson: JSON.stringify(actionConfigJson),
         }));
@@ -144,7 +142,6 @@ let Node = class Node extends core_1.Controller {
         };
     }
     async executeActionJson(params, manager) {
-        console.log('params', params);
         const { nodeId, originName, originKey, fromValues } = params;
         // we need to get the value from merge values with originKey
         const getParameterizedNodeData = await core_1.__(this.getParameterizedNode({ nodeId: nodeId }, manager));
@@ -154,9 +151,6 @@ let Node = class Node extends core_1.Controller {
         const originValue = resValueObject[fromValues];
         const executeViewString = `select * from ${originName} where ${originKey} = ${originValue}`;
         const resExecuteView = await typeorm_1.getManager().query(executeViewString);
-        console.log('mergeValues', mergeValues);
-        console.log('findOriginValue', findOriginValue);
-        console.log('executeViewString', executeViewString);
         /*const executeView = `select * from ${originName} where ${originKey} = ${newEvent.dataId}`;
         const resExecuteView = await getManager().query(executeView);*/
         return {

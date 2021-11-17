@@ -6,6 +6,7 @@ export default class Flow extends PxpEntity {
     vendorId: number;
     code: number;
     name: string;
+    description: string;
     enabled: string;
     type: string;
     instances: FlowInstance[];

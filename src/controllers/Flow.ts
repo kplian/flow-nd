@@ -82,6 +82,7 @@ class Flow extends Controller {
     const newFlow = new FlowModel();
     Object.assign(newFlow, flowToCopy);
     newFlow.name = params.name;
+    newFlow.description = params.description;
     const insertNewFlow = await __(manager.save(FlowModel, newFlow));
 
     // create the nodes

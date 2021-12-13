@@ -59,6 +59,10 @@ __decorate([
     __metadata("design:type", String)
 ], Action.prototype, "hidden", void 0);
 __decorate([
+    typeorm_1.Column({ name: 'schema_json', type: 'text' }),
+    __metadata("design:type", String)
+], Action.prototype, "schemaJson", void 0);
+__decorate([
     typeorm_1.ManyToOne(() => ActionType_1.default, actionType => actionType.actions, { eager: true }),
     typeorm_1.JoinColumn({ name: 'action_type_id' }),
     __metadata("design:type", ActionType_1.default)

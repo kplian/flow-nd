@@ -29,6 +29,7 @@ const typeorm_1 = require("typeorm");
 const Node_1 = __importDefault(require("../entity/Node"));
 const NodeConnection_1 = __importDefault(require("../entity/NodeConnection"));
 const core_1 = require("@pxp-nd/core");
+const lodash_1 = __importDefault(require("lodash"));
 const FieldMap_1 = __importDefault(require("../entity/FieldMap"));
 const OriginName_1 = __importDefault(require("../entity/OriginName"));
 let Node = class Node extends core_1.Controller {
@@ -79,7 +80,8 @@ let Node = class Node extends core_1.Controller {
         };
     }
     async getParameterizedNode(params, manager) {
-        const { nodeId, flowId } = params;
+        lodash_1.default.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
+        const { nodeId, flowId, substitutionsSchemaJson } = params;
         /*const tNodeOrigin =  __(NodeModel.find({
           relations: ['action'],
           where: {
@@ -101,10 +103,12 @@ let Node = class Node extends core_1.Controller {
           tNodeData,
           tFieldMapData
         ]);*/
-        const { actionConfigJson, action: { configJsonTemplate, actionType: { schemaJson } } } = nodeData;
+        const { actionConfigJson, action: { schemaJson, configJsonTemplate, actionType: { schemaJson: schemaJsonFromActionType } } } = nodeData;
         const actionConfigJsonObject = actionConfigJson ? JSON.parse(actionConfigJson) : {};
         const configJsonTemplateObject = configJsonTemplate ? JSON.parse(configJsonTemplate) : {};
-        let schemaJsonObject = schemaJson ? JSON.parse(schemaJson) : {};
+        let schemaJsonFromActionTypeObject = schemaJsonFromActionType ? JSON.parse(lodash_1.default.template(schemaJsonFromActionType)(substitutionsSchemaJson)) : {};
+        let schemaJsonFromActionObject = schemaJson ? JSON.parse(lodash_1.default.template(schemaJson)(substitutionsSchemaJson)) : {};
+        let schemaJsonObject = { ...schemaJsonFromActionTypeObject, ...schemaJsonFromActionObject };
         const mergeValues = {
             ...configJsonTemplateObject,
             ...actionConfigJsonObject
@@ -177,7 +181,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], Node.prototype, "AddActionConfigJson", null);
 __decorate([
-    core_1.Get(),
+    core_1.Post(),
     core_1.DbSettings('Orm'),
     core_1.ReadOnly(false),
     core_1.Log(true),

@@ -89,12 +89,14 @@ class Node extends Controller {
     }
   }
 
-  @Get()
+  @Post()
   @DbSettings('Orm')
   @ReadOnly(false)
   @Log(true)
   async getParameterizedNode(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
-    const { nodeId, flowId } = params;
+    _.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
+
+    const { nodeId, flowId, substitutionsSchemaJson } = params;
     /*const tNodeOrigin =  __(NodeModel.find({
       relations: ['action'],
       where: {
@@ -118,11 +120,13 @@ class Node extends Controller {
       tFieldMapData
     ]);*/
 
-    const {actionConfigJson, action: {  configJsonTemplate , actionType: { schemaJson }}} = nodeData;
+    const {actionConfigJson, action: { schemaJson, configJsonTemplate , actionType: { schemaJson: schemaJsonFromActionType }}} = nodeData;
 
     const actionConfigJsonObject = actionConfigJson ? JSON.parse(actionConfigJson) : {};
     const configJsonTemplateObject = configJsonTemplate ? JSON.parse(configJsonTemplate) : {};
-    let schemaJsonObject = schemaJson ? JSON.parse(schemaJson) : {};
+    let schemaJsonFromActionTypeObject = schemaJsonFromActionType ? JSON.parse(_.template(schemaJsonFromActionType)(substitutionsSchemaJson)) : {};
+    let schemaJsonFromActionObject = schemaJson ? JSON.parse(_.template(schemaJson)(substitutionsSchemaJson)) : {};
+    let schemaJsonObject = {...schemaJsonFromActionTypeObject, ...schemaJsonFromActionObject};
 
     const mergeValues = {
       ...configJsonTemplateObject,

@@ -11,5 +11,6 @@ export default class ActionType extends PxpEntity {
     hidden: string;
     controller: string;
     extraSchemaJson: string;
+    actionsJson: string;
     actions: Action[];
 }

@@ -53,7 +53,11 @@ let NodeInstance = class NodeInstance extends core_1.Controller {
         if (configJsonTemplate !== '' || actionConfigJson !== '') {
             const actionConfigJsonObject = actionConfigJson && JSON.parse(lodash_1.default.template(actionConfigJson)(resultFromOrigin));
             const configJsonTemplateObject = configJsonTemplate && JSON.parse(lodash_1.default.template(configJsonTemplate)(resultFromOrigin));
-            mergeJson = Object.assign(Object.assign(Object.assign({}, (configJsonTemplateObject || {})), (actionConfigJsonObject || {})), { __resultFromOrigin: resultFromOrigin });
+            mergeJson = {
+                ...(configJsonTemplateObject || {}),
+                ...(actionConfigJsonObject || {}),
+                __resultFromOrigin: resultFromOrigin
+            };
         }
         let nodeInstance = new NodeInstance_1.default();
         nodeInstance.flowInstanceId = flowInstance.flowInstanceId;
@@ -116,7 +120,6 @@ let NodeInstance = class NodeInstance extends core_1.Controller {
                     .andWhere("ni.status = 'WAIT' ")
                     .limit((maxNodes && maxNodes.value))
                     .getMany());
-                console.log('nodeInstanceDelayData', nodeInstanceDelayData);
                 for (const nodeInstance of nodeInstanceDelayData) {
                     //update status from wait to executing
                     await core_1.__(manager.update(NodeInstance_1.default, nodeInstance.nodeInstanceId, {

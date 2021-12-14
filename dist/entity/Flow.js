@@ -35,6 +35,10 @@ __decorate([
     __metadata("design:type", String)
 ], Flow.prototype, "name", void 0);
 __decorate([
+    typeorm_1.Column({ type: 'text', nullable: false }),
+    __metadata("design:type", String)
+], Flow.prototype, "description", void 0);
+__decorate([
     typeorm_1.Column({ type: 'varchar', nullable: false, length: 100 }),
     __metadata("design:type", String)
 ], Flow.prototype, "enabled", void 0);

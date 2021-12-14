@@ -51,7 +51,7 @@ __decorate([
     typeorm_1.ManyToOne(() => Node_1.default, node => node.nodeInstances, { eager: true }),
     typeorm_1.JoinColumn({ name: 'node_id' }),
     __metadata("design:type", Node_1.default)
-], NodeInstance.prototype, "nodes", void 0);
+], NodeInstance.prototype, "node", void 0);
 NodeInstance = __decorate([
     typeorm_1.Entity({ name: 'twf_node_instance' })
 ], NodeInstance);

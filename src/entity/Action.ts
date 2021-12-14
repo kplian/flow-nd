@@ -48,6 +48,9 @@ export default class Action extends PxpEntity{
   @Column({ type: 'varchar', nullable: false, length: 1, default: 'N' })
   hidden: string;
 
+  @Column({ name: 'schema_json', type: 'text' })
+  schemaJson: string;
+
   @ManyToOne( () => ActionType, actionType => actionType.actions, {eager: true})
   @JoinColumn({ name: 'action_type_id' })
   actionType: ActionType;

@@ -8,4 +8,4 @@ import NodeController from './Node';
 import NodeInstanceController from './NodeInstance';
 import OriginNameController from './OriginName';
 export { ActionController, ActionTypeController, EventController, FieldMapController, FlowController, FlowInstanceController, NodeController, NodeInstanceController, OriginNameController };
-export declare const controllers: (typeof ActionController)[];
+export declare const controllers: (typeof ActionTypeController)[];

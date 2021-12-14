@@ -29,6 +29,9 @@ const typeorm_1 = require("typeorm");
 const Node_1 = __importDefault(require("../entity/Node"));
 const NodeConnection_1 = __importDefault(require("../entity/NodeConnection"));
 const core_1 = require("@pxp-nd/core");
+const lodash_1 = __importDefault(require("lodash"));
+const FieldMap_1 = __importDefault(require("../entity/FieldMap"));
+const OriginName_1 = __importDefault(require("../entity/OriginName"));
 let Node = class Node extends core_1.Controller {
     async getNodeData(node, dataId, manager) {
         const { action: { originName, originKey } } = node;
@@ -57,7 +60,106 @@ let Node = class Node extends core_1.Controller {
                 nodeConnection = await manager.save(nodeConnection);
             }
         }
-        return node;
+        const { nodeId } = node;
+        const nodeData = await manager.findOne(Node_1.default, nodeId);
+        return nodeData;
+    }
+    async AddActionConfigJson(params, manager) {
+        let { nodeId: removed, __metadata: removed2, ...actionConfigJson } = params;
+        Object.entries(params.__metadata).forEach(([nameKey, values]) => {
+            actionConfigJson[nameKey] = `{{ ${values.name} }}`;
+        });
+        const upd = await core_1.__(manager.update(Node_1.default, params.nodeId, {
+            actionConfigJson: JSON.stringify(actionConfigJson),
+        }));
+        return {
+            actionConfigJson,
+            success: true,
+            nodeId: params.nodeId,
+            upd
+        };
+    }
+    async getParameterizedNode(params, manager) {
+        lodash_1.default.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
+        const { nodeId, flowId, substitutionsSchemaJson } = params;
+        /*const tNodeOrigin =  __(NodeModel.find({
+          relations: ['action'],
+          where: {
+            flowId: flowId,
+            action: {
+              originName: Not(IsNull())
+            }
+          }
+        }));*/
+        const tNodeData = core_1.__(Node_1.default.findOne(nodeId));
+        const tFieldMapData = core_1.__(manager.createQueryBuilder(FieldMap_1.default, 'fm')
+            .innerJoin(OriginName_1.default, 'on', 'on.originNameId = fm.originNameId')
+            .where("on.name = :n ", { n: 'v_member' })
+            .getMany());
+        //const nodeOrigin = await tNodeOrigin; todo
+        const nodeData = await tNodeData;
+        const fieldMapData = await tFieldMapData;
+        /*const [nodeData, fieldMapData] = await Promise.all([
+          tNodeData,
+          tFieldMapData
+        ]);*/
+        const { actionConfigJson, action: { schemaJson, configJsonTemplate, actionType: { schemaJson: schemaJsonFromActionType } } } = nodeData;
+        const actionConfigJsonObject = actionConfigJson ? JSON.parse(actionConfigJson) : {};
+        const configJsonTemplateObject = configJsonTemplate ? JSON.parse(configJsonTemplate) : {};
+        let schemaJsonFromActionTypeObject = schemaJsonFromActionType ? JSON.parse(lodash_1.default.template(schemaJsonFromActionType)(substitutionsSchemaJson)) : {};
+        let schemaJsonFromActionObject = schemaJson ? JSON.parse(lodash_1.default.template(schemaJson)(substitutionsSchemaJson)) : {};
+        let schemaJsonObject = { ...schemaJsonFromActionTypeObject, ...schemaJsonFromActionObject };
+        const mergeValues = {
+            ...configJsonTemplateObject,
+            ...actionConfigJsonObject
+        };
+        const verifyIfValueFromFieldMap = (str) => {
+            if (/^{{/.test(str) && /}}$/.test(str)) {
+                return true;
+            }
+            return false;
+        };
+        const findFieldMapAndMetaData = (value) => {
+            const found = fieldMapData.find((fmd) => `{{ ${fmd.name} }}` === value) || {};
+            return {
+                initialValue: found.alias || value,
+                metadata: found
+            };
+        };
+        Object.entries(mergeValues).forEach(([nameKey, value]) => {
+            if (schemaJsonObject[nameKey]) {
+                schemaJsonObject[nameKey] = {
+                    ...schemaJsonObject[nameKey],
+                    initialValue: value,
+                    ...(verifyIfValueFromFieldMap(value) && { fromFieldMap: true, ...findFieldMapAndMetaData(value) }),
+                };
+            }
+        });
+        return {
+            actionConfigJsonObject,
+            configJsonTemplateObject,
+            mergeValues,
+            schemaJsonObject,
+            schemaJson,
+            node: nodeData,
+            fieldMapData,
+        };
+    }
+    async executeActionJson(params, manager) {
+        const { nodeId, originName, originKey, fromValues } = params;
+        // we need to get the value from merge values with originKey
+        const getParameterizedNodeData = await core_1.__(this.getParameterizedNode({ nodeId: nodeId }, manager));
+        const { mergeValues } = getParameterizedNodeData;
+        const findOriginValue = Object.entries(mergeValues).find(([nameValue]) => fromValues === nameValue);
+        const resValueObject = Object.fromEntries([findOriginValue]);
+        const originValue = resValueObject[fromValues];
+        const executeViewString = `select * from ${originName} where ${originKey} = ${originValue}`;
+        const resExecuteView = await typeorm_1.getManager().query(executeViewString);
+        /*const executeView = `select * from ${originName} where ${originKey} = ${newEvent.dataId}`;
+        const resExecuteView = await getManager().query(executeView);*/
+        return {
+            ...resExecuteView[0]
+        };
     }
 };
 __decorate([
@@ -69,6 +171,33 @@ __decorate([
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
 ], Node.prototype, "add", null);
+__decorate([
+    core_1.Post(),
+    core_1.DbSettings('Orm'),
+    core_1.ReadOnly(false),
+    core_1.Log(true),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
+    __metadata("design:returntype", Promise)
+], Node.prototype, "AddActionConfigJson", null);
+__decorate([
+    core_1.Post(),
+    core_1.DbSettings('Orm'),
+    core_1.ReadOnly(false),
+    core_1.Log(true),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
+    __metadata("design:returntype", Promise)
+], Node.prototype, "getParameterizedNode", null);
+__decorate([
+    core_1.Post(),
+    core_1.DbSettings('Orm'),
+    core_1.ReadOnly(false),
+    core_1.Log(true),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
+    __metadata("design:returntype", Promise)
+], Node.prototype, "executeActionJson", null);
 Node = __decorate([
     core_1.Model('flow-nd/Node')
 ], Node);

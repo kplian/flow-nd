@@ -11,6 +11,7 @@ export default class Action extends PxpEntity {
     originKey: string;
     controllerFunction: string;
     configJsonTemplate: string;
+    eventConfig: string;
     hidden: string;
     schemaJson: string;
     actionType: ActionType;

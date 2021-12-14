@@ -55,6 +55,10 @@ __decorate([
     __metadata("design:type", String)
 ], Action.prototype, "configJsonTemplate", void 0);
 __decorate([
+    typeorm_1.Column({ name: 'event_config', type: 'text' }),
+    __metadata("design:type", String)
+], Action.prototype, "eventConfig", void 0);
+__decorate([
     typeorm_1.Column({ type: 'varchar', nullable: false, length: 1, default: 'N' }),
     __metadata("design:type", String)
 ], Action.prototype, "hidden", void 0);

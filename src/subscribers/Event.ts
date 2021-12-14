@@ -41,7 +41,7 @@ export class Event implements EntitySubscriberInterface<EventModel> {
       const executeView = `select * from ${originName} where ${originKey} = ${newEvent.dataId}`;
       const resExecuteView = await getManager().query(executeView);
       const flow = await __(Flow.findOne({ where: { flowId: n.flowId } }));
-      if (flow.vendorId == resExecuteView[0].vendor_id && checkConditions(resExecuteView[0], n.flowId, newEvent.actionId)) {
+      if (flow.vendorId == resExecuteView[0].vendor_id && this.checkConditions(resExecuteView[0], n.flowId, newEvent.actionId)) {
         //now check all conditions
         let flowInstance = new FlowInstanceModel();
         flowInstance.flowId = n.flowId;
@@ -55,7 +55,7 @@ export class Event implements EntitySubscriberInterface<EventModel> {
 
     }
   }
-  checkConditions(viewData: Record<string, any>, flowId: number, actionId: number) {
+  async checkConditions(viewData: Record<string, any>, flowId: number, actionId: number) {
     const action = await Action.findOne(actionId);
     const node = await Node.findOne({ where: { actionId, flowId }});
     const actionConfigJson = JSON.parse(node.actionConfigJson);
@@ -63,8 +63,8 @@ export class Event implements EntitySubscriberInterface<EventModel> {
     if (action.eventConfig) {
       const eventConfig = JSON.parse(action.eventConfig);
       if (eventConfig.filters) {
-        eventConfig.filters.forEach(filter => {
-          if (viewData[filter.originField] != actionConfigJson[filter.nodeField]) {
+        eventConfig.filters.forEach((filter: Record<string, any>) => {
+          if (actionConfigJson[filter.nodeField] && viewData[filter.originField] != actionConfigJson[filter.nodeField] ) {
             res = false;
           }
         });

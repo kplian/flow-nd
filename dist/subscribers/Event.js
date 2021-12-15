@@ -27,6 +27,7 @@ exports.Event = void 0;
 const typeorm_1 = require("typeorm");
 const Event_1 = __importDefault(require("../entity/Event"));
 const Node_1 = __importDefault(require("../entity/Node"));
+const Action_1 = __importDefault(require("../entity/Action"));
 const Flow_1 = __importDefault(require("../entity/Flow"));
 const core_1 = require("@pxp-nd/core");
 const FlowInstance_1 = __importDefault(require("../entity/FlowInstance"));
@@ -45,7 +46,8 @@ let Event = class Event {
             const executeView = `select * from ${originName} where ${originKey} = ${newEvent.dataId}`;
             const resExecuteView = await typeorm_1.getManager().query(executeView);
             const flow = await core_1.__(Flow_1.default.findOne({ where: { flowId: n.flowId } }));
-            if (flow.vendorId == resExecuteView[0].vendor_id) {
+            if (flow.vendorId == resExecuteView[0].vendor_id && this.checkConditions(resExecuteView[0], n.flowId, newEvent.actionId)) {
+                //now check all conditions
                 let flowInstance = new FlowInstance_1.default();
                 flowInstance.flowId = n.flowId;
                 flowInstance.dataId = newEvent.dataId;
@@ -56,6 +58,23 @@ let Event = class Event {
                 flowInstance = await event.manager.save(FlowInstance_1.default, flowInstance);
             }
         }
+    }
+    async checkConditions(viewData, flowId, actionId) {
+        const action = await Action_1.default.findOne(actionId);
+        const node = await Node_1.default.findOne({ where: { actionId, flowId } });
+        const actionConfigJson = JSON.parse(node.actionConfigJson);
+        let res = true;
+        if (action.eventConfig) {
+            const eventConfig = JSON.parse(action.eventConfig);
+            if (eventConfig.filters) {
+                eventConfig.filters.forEach((filter) => {
+                    if (actionConfigJson[filter.nodeField] && viewData[filter.originField] != actionConfigJson[filter.nodeField]) {
+                        res = false;
+                    }
+                });
+            }
+        }
+        return res;
     }
 };
 Event = __decorate([

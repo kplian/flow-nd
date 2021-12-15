@@ -17,4 +17,5 @@ import EventModel from '../entity/Event';
 export declare class Event implements EntitySubscriberInterface<EventModel> {
     listenTo(): typeof EventModel;
     afterInsert(event: InsertEvent<EventModel>): Promise<void>;
+    checkConditions(viewData: Record<string, any>, flowId: number, actionId: number): Promise<boolean>;
 }

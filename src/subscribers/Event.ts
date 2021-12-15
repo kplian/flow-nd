@@ -15,6 +15,7 @@
 import { EntitySubscriberInterface, EventSubscriber, InsertEvent, getManager } from 'typeorm';
 import EventModel from '../entity/Event';
 import Node from '../entity/Node';
+import Action from '../entity/Action';
 import Flow from '../entity/Flow';
 import { __ } from '@pxp-nd/core';
 import FlowInstanceModel from '../entity/FlowInstance';
@@ -40,7 +41,8 @@ export class Event implements EntitySubscriberInterface<EventModel> {
       const executeView = `select * from ${originName} where ${originKey} = ${newEvent.dataId}`;
       const resExecuteView = await getManager().query(executeView);
       const flow = await __(Flow.findOne({ where: { flowId: n.flowId } }));
-      if (flow.vendorId == resExecuteView[0].vendor_id) {
+      if (flow.vendorId == resExecuteView[0].vendor_id && this.checkConditions(resExecuteView[0], n.flowId, newEvent.actionId)) {
+        //now check all conditions
         let flowInstance = new FlowInstanceModel();
         flowInstance.flowId = n.flowId;
         flowInstance.dataId = newEvent.dataId;
@@ -52,6 +54,23 @@ export class Event implements EntitySubscriberInterface<EventModel> {
       }
 
     }
+  }
+  async checkConditions(viewData: Record<string, any>, flowId: number, actionId: number) {
+    const action = await Action.findOne(actionId);
+    const node = await Node.findOne({ where: { actionId, flowId }});
+    const actionConfigJson = JSON.parse(node.actionConfigJson);
+    let res = true;
+    if (action.eventConfig) {
+      const eventConfig = JSON.parse(action.eventConfig);
+      if (eventConfig.filters) {
+        eventConfig.filters.forEach((filter: Record<string, any>) => {
+          if (actionConfigJson[filter.nodeField] && viewData[filter.originField] != actionConfigJson[filter.nodeField] ) {
+            res = false;
+          }
+        });
+      }
+    }
+    return res;
   }
 /*
   /!**

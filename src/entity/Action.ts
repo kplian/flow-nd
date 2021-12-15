@@ -42,6 +42,9 @@ export default class Action extends PxpEntity{
   @Column({ name: 'config_json_template', type: 'text' })
   configJsonTemplate: string;
 
+  @Column({ name: 'event_config', type: 'text' })
+  eventConfig: string;
+
   @Column({ type: 'varchar', nullable: false, length: 1, default: 'N' })
   hidden: string;
 

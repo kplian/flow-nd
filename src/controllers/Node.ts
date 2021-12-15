@@ -23,6 +23,7 @@ import NodeInstanceModel from "../entity/NodeInstance";
 import _ from 'lodash';
 import FieldMapEntity from "../entity/FieldMap";
 import OriginNameEntity from "../entity/OriginName";
+import axios from 'axios';
 
 
 @Model('flow-nd/Node')
@@ -97,19 +98,20 @@ class Node extends Controller {
     _.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
 
     const { nodeId, flowId, substitutionsSchemaJson } = params;
-    /*const tNodeOrigin =  __(NodeModel.find({
+    const tNodeOrigin =  await __(NodeModel.findOne({
       relations: ['action'],
       where: {
         flowId: flowId,
+        isInit: 'Y',
         action: {
           originName: Not(IsNull())
         }
       }
-    }));*/
+    }));
     const tNodeData =  __(NodeModel.findOne(nodeId));
     const tFieldMapData =  __(manager.createQueryBuilder(FieldMapEntity, 'fm')
         .innerJoin(OriginNameEntity, 'on', 'on.originNameId = fm.originNameId')
-        .where("on.name = :n ", {n: 'v_member'})
+        .where("on.name = :n ", {n: tNodeOrigin.action.originName})
         .getMany());
 
     //const nodeOrigin = await tNodeOrigin; todo
@@ -145,15 +147,55 @@ class Node extends Controller {
         metadata: found
       };
     }
-    Object.entries(mergeValues).forEach(([nameKey, value]) => {
+    // this logic is for autocomplete for moment
+    const findFieldInConfigForComponent = async (json: Record<any, any>, value: any) => {
+      console.log('json', json)
+      if (json.formComponent && json.formComponent.type === 'AutoComplete') {
+        console.log('json.formComponent', json.formComponent.store)
+        const url: string = json.formComponent.store.axios.url as string;
+        const method: string = json.formComponent.store.axios.method as string;
+        const data = json.formComponent.store.axios.data;
+        const idDD = json.formComponent.store.idDD;
+        const descDD = json.formComponent.store.descDD;
+
+        const config = {
+          method: method,
+          url: url,
+          headers: {
+            'Authorization': '' + process.env.TOKEN_PXP_ND + '',
+            'Content-Type': 'application/json'
+          },
+          data: {
+            ...data,
+            [idDD]: value
+          }
+        };
+
+
+        console.log('config', config)
+        // @ts-ignore
+        const resControllerAxios = await __(axios(config));
+        console.log('resControllerAxios', resControllerAxios.data.data)
+        console.log('resControllerAxios', resControllerAxios.data.data[descDD])
+        const desc = resControllerAxios.data.data[descDD];
+        return desc;
+
+      }
+      return undefined;
+    }
+    for (const [nameKey, value] of Object.entries(mergeValues)) {
       if(schemaJsonObject[nameKey]) {
+        const descValue = await __(findFieldInConfigForComponent(schemaJsonObject[nameKey], value));
+
+        console.log('descValue',descValue)
         schemaJsonObject[nameKey] = {
           ...schemaJsonObject[nameKey],
           initialValue: value,
+          ...(descValue && { descValue: descValue }),
           ...(verifyIfValueFromFieldMap(value as string) && { fromFieldMap: true, ...findFieldMapAndMetaData(value) }),
         }
       }
-    });
+    }
 
 
     return {

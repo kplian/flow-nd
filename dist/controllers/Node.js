@@ -32,6 +32,7 @@ const core_1 = require("@pxp-nd/core");
 const lodash_1 = __importDefault(require("lodash"));
 const FieldMap_1 = __importDefault(require("../entity/FieldMap"));
 const OriginName_1 = __importDefault(require("../entity/OriginName"));
+const axios_1 = __importDefault(require("axios"));
 let Node = class Node extends core_1.Controller {
     async getNodeData(node, dataId, manager) {
         const { action: { originName, originKey } } = node;
@@ -82,19 +83,20 @@ let Node = class Node extends core_1.Controller {
     async getParameterizedNode(params, manager) {
         lodash_1.default.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
         const { nodeId, flowId, substitutionsSchemaJson } = params;
-        /*const tNodeOrigin =  __(NodeModel.find({
-          relations: ['action'],
-          where: {
-            flowId: flowId,
-            action: {
-              originName: Not(IsNull())
+        const tNodeOrigin = await core_1.__(Node_1.default.findOne({
+            relations: ['action'],
+            where: {
+                flowId: flowId,
+                isInit: 'Y',
+                action: {
+                    originName: typeorm_1.Not(typeorm_1.IsNull())
+                }
             }
-          }
-        }));*/
+        }));
         const tNodeData = core_1.__(Node_1.default.findOne(nodeId));
         const tFieldMapData = core_1.__(manager.createQueryBuilder(FieldMap_1.default, 'fm')
             .innerJoin(OriginName_1.default, 'on', 'on.originNameId = fm.originNameId')
-            .where("on.name = :n ", { n: 'v_member' })
+            .where("on.name = :n ", { n: tNodeOrigin.action.originName })
             .getMany());
         //const nodeOrigin = await tNodeOrigin; todo
         const nodeData = await tNodeData;
@@ -126,15 +128,50 @@ let Node = class Node extends core_1.Controller {
                 metadata: found
             };
         };
-        Object.entries(mergeValues).forEach(([nameKey, value]) => {
+        // this logic is for autocomplete for moment
+        const findFieldInConfigForComponent = async (json, value) => {
+            console.log('json', json);
+            if (json.formComponent && json.formComponent.type === 'AutoComplete') {
+                console.log('json.formComponent', json.formComponent.store);
+                const url = json.formComponent.store.axios.url;
+                const method = json.formComponent.store.axios.method;
+                const data = json.formComponent.store.axios.data;
+                const idDD = json.formComponent.store.idDD;
+                const descDD = json.formComponent.store.descDD;
+                const config = {
+                    method: method,
+                    url: url,
+                    headers: {
+                        'Authorization': '' + process.env.TOKEN_PXP_ND + '',
+                        'Content-Type': 'application/json'
+                    },
+                    data: {
+                        ...data,
+                        [idDD]: value
+                    }
+                };
+                console.log('config', config);
+                // @ts-ignore
+                const resControllerAxios = await core_1.__(axios_1.default(config));
+                console.log('resControllerAxios', resControllerAxios.data.data);
+                console.log('resControllerAxios', resControllerAxios.data.data[descDD]);
+                const desc = resControllerAxios.data.data[descDD];
+                return desc;
+            }
+            return undefined;
+        };
+        for (const [nameKey, value] of Object.entries(mergeValues)) {
             if (schemaJsonObject[nameKey]) {
+                const descValue = await core_1.__(findFieldInConfigForComponent(schemaJsonObject[nameKey], value));
+                console.log('descValue', descValue);
                 schemaJsonObject[nameKey] = {
                     ...schemaJsonObject[nameKey],
                     initialValue: value,
+                    ...(descValue && { descValue: descValue }),
                     ...(verifyIfValueFromFieldMap(value) && { fromFieldMap: true, ...findFieldMapAndMetaData(value) }),
                 };
             }
-        });
+        }
         return {
             actionConfigJsonObject,
             configJsonTemplateObject,

@@ -97,7 +97,7 @@ class Node extends Controller {
   async getParameterizedNode(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
     _.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
 
-    const { nodeId, flowId, substitutionsSchemaJson } = params;
+    const { nodeId, flowId, substitutionsSchemaJson = {} } = params;
     const tNodeOrigin =  await __(NodeModel.findOne({
       relations: ['action'],
       where: {
@@ -147,11 +147,23 @@ class Node extends Controller {
         metadata: found
       };
     }
+
+    const findFieldMapUniqueByType = (fieldMappingType: string) => {
+      const filtered = fieldMapData.filter((fmd: { type: string}) => fmd.type === fieldMappingType);
+
+      if(filtered && filtered.length === 1) {
+        const [found] = filtered;
+        return {
+          initialValue: found.alias,
+          metadata: found
+        };
+      }
+      return undefined;
+
+    }
     // this logic is for autocomplete for moment
     const findFieldInConfigForComponent = async (json: Record<any, any>, value: any) => {
-      console.log('json', json)
       if (json.formComponent && json.formComponent.type === 'AutoComplete') {
-        console.log('json.formComponent', json.formComponent.store)
         const url: string = json.formComponent.store.axios.url as string;
         const method: string = json.formComponent.store.axios.method as string;
         const data = json.formComponent.store.axios.data;
@@ -171,23 +183,36 @@ class Node extends Controller {
           }
         };
 
-
-        console.log('config', config)
         // @ts-ignore
         const resControllerAxios = await __(axios(config));
-        console.log('resControllerAxios', resControllerAxios.data.data)
-        console.log('resControllerAxios', resControllerAxios.data.data[descDD])
         const desc = resControllerAxios.data.data[descDD];
         return desc;
 
+      } else if(json.formComponentTemplate && json.configGetDescValue) { // todo we need to see how works here
+
+        const {controller, storeId, descColumn} = json.configGetDescValue;
+        const config = {
+          method: "get",
+          url: `http://localhost:${process.env.PORT}/api/${controller}`,
+          headers: {
+            'Authorization': '' + process.env.TOKEN_PXP_ND + '',
+            'Content-Type': 'application/json'
+          },
+          data: {
+            [storeId]: value
+          }
+        };
+
+        // @ts-ignore
+        const resControllerAxios = await __(axios(config));
+        const desc = resControllerAxios.data.data[descColumn];
+        return desc;
       }
       return undefined;
     }
     for (const [nameKey, value] of Object.entries(mergeValues)) {
       if(schemaJsonObject[nameKey]) {
         const descValue = await __(findFieldInConfigForComponent(schemaJsonObject[nameKey], value));
-
-        console.log('descValue',descValue)
         schemaJsonObject[nameKey] = {
           ...schemaJsonObject[nameKey],
           initialValue: value,
@@ -197,6 +222,15 @@ class Node extends Controller {
       }
     }
 
+    Object.entries(schemaJsonObject)
+        .filter(([, value]: [nameKey: string, value: any]) => value.initialValue === undefined && value.fromFieldMap === undefined && value.fieldMappingType)
+        .forEach(([nameKey]) => {
+          const hasUniqueByTypeInMappingData = findFieldMapUniqueByType(schemaJsonObject[nameKey].fieldMappingType);
+          schemaJsonObject[nameKey] = {
+            ...schemaJsonObject[nameKey],
+            ...(hasUniqueByTypeInMappingData && { fromFieldMap: true, ...hasUniqueByTypeInMappingData }),
+          };
+        })
 
     return {
       actionConfigJsonObject,

@@ -82,7 +82,7 @@ let Node = class Node extends core_1.Controller {
     }
     async getParameterizedNode(params, manager) {
         lodash_1.default.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
-        const { nodeId, flowId, substitutionsSchemaJson } = params;
+        const { nodeId, flowId, substitutionsSchemaJson = {} } = params;
         const tNodeOrigin = await core_1.__(Node_1.default.findOne({
             relations: ['action'],
             where: {
@@ -128,11 +128,20 @@ let Node = class Node extends core_1.Controller {
                 metadata: found
             };
         };
+        const findFieldMapUniqueByType = (fieldMappingType) => {
+            const filtered = fieldMapData.filter((fmd) => fmd.type === fieldMappingType);
+            if (filtered && filtered.length === 1) {
+                const [found] = filtered;
+                return {
+                    initialValue: found.alias,
+                    metadata: found
+                };
+            }
+            return undefined;
+        };
         // this logic is for autocomplete for moment
         const findFieldInConfigForComponent = async (json, value) => {
-            console.log('json', json);
             if (json.formComponent && json.formComponent.type === 'AutoComplete') {
-                console.log('json.formComponent', json.formComponent.store);
                 const url = json.formComponent.store.axios.url;
                 const method = json.formComponent.store.axios.method;
                 const data = json.formComponent.store.axios.data;
@@ -150,12 +159,27 @@ let Node = class Node extends core_1.Controller {
                         [idDD]: value
                     }
                 };
-                console.log('config', config);
                 // @ts-ignore
                 const resControllerAxios = await core_1.__(axios_1.default(config));
-                console.log('resControllerAxios', resControllerAxios.data.data);
-                console.log('resControllerAxios', resControllerAxios.data.data[descDD]);
                 const desc = resControllerAxios.data.data[descDD];
+                return desc;
+            }
+            else if (json.formComponentTemplate && json.configGetDescValue) { // todo we need to see how works here
+                const { controller, storeId, descColumn } = json.configGetDescValue;
+                const config = {
+                    method: "get",
+                    url: `http://localhost:${process.env.PORT}/api/${controller}`,
+                    headers: {
+                        'Authorization': '' + process.env.TOKEN_PXP_ND + '',
+                        'Content-Type': 'application/json'
+                    },
+                    data: {
+                        [storeId]: value
+                    }
+                };
+                // @ts-ignore
+                const resControllerAxios = await core_1.__(axios_1.default(config));
+                const desc = resControllerAxios.data.data[descColumn];
                 return desc;
             }
             return undefined;
@@ -163,7 +187,6 @@ let Node = class Node extends core_1.Controller {
         for (const [nameKey, value] of Object.entries(mergeValues)) {
             if (schemaJsonObject[nameKey]) {
                 const descValue = await core_1.__(findFieldInConfigForComponent(schemaJsonObject[nameKey], value));
-                console.log('descValue', descValue);
                 schemaJsonObject[nameKey] = {
                     ...schemaJsonObject[nameKey],
                     initialValue: value,
@@ -172,6 +195,15 @@ let Node = class Node extends core_1.Controller {
                 };
             }
         }
+        Object.entries(schemaJsonObject)
+            .filter(([, value]) => value.initialValue === undefined && value.fromFieldMap === undefined && value.fieldMappingType)
+            .forEach(([nameKey]) => {
+            const hasUniqueByTypeInMappingData = findFieldMapUniqueByType(schemaJsonObject[nameKey].fieldMappingType);
+            schemaJsonObject[nameKey] = {
+                ...schemaJsonObject[nameKey],
+                ...(hasUniqueByTypeInMappingData && { fromFieldMap: true, ...hasUniqueByTypeInMappingData }),
+            };
+        });
         return {
             actionConfigJsonObject,
             configJsonTemplateObject,

@@ -33,8 +33,22 @@ class Flow extends Controller {
     const nodes = await NodeModel.find({ flowId: params.flowId });
     const restNodes = [];
     for (let node of nodes) {
+      const {actionConfigJson, action: {actionType: { schemaJson }}} = node;
+      const actionConfigJsonObject = actionConfigJson ? JSON.parse(actionConfigJson) : {};
+      const schemaJsonObject = schemaJson ? JSON.parse(schemaJson) : {};
+      const valuesForShowingInNode:any = {};
+      Object.entries(schemaJsonObject).filter(([n, sjo]:[n: string, sjo: any]) => sjo.showInNode === true).forEach(([nameKey, json]: [nameKey: string, json: any]) => {
+        valuesForShowingInNode[nameKey] = {
+          label: json.label as string,
+          value:actionConfigJsonObject[nameKey] || null
+        }
+      })
+      const nodeRow = {
+        ...node,
+        valuesForShowingInNode
+      }
       const connections = await NodeConnectionModel.find({ nodeIdMaster: node.nodeId});
-      restNodes.push({ node, connections: connections.map(c => c.nodeIdChild) });
+      restNodes.push({ node: nodeRow, connections: connections.map(c => c.nodeIdChild) });
     }
     return restNodes;
   }

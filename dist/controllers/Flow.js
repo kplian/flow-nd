@@ -35,8 +35,22 @@ let Flow = class Flow extends core_1.Controller {
         const nodes = await Node_1.default.find({ flowId: params.flowId });
         const restNodes = [];
         for (let node of nodes) {
+            const { actionConfigJson, action: { actionType: { schemaJson } } } = node;
+            const actionConfigJsonObject = actionConfigJson ? JSON.parse(actionConfigJson) : {};
+            const schemaJsonObject = schemaJson ? JSON.parse(schemaJson) : {};
+            const valuesForShowingInNode = {};
+            Object.entries(schemaJsonObject).filter(([n, sjo]) => sjo.showInNode === true).forEach(([nameKey, json]) => {
+                valuesForShowingInNode[nameKey] = {
+                    label: json.label,
+                    value: actionConfigJsonObject[nameKey] || null
+                };
+            });
+            const nodeRow = {
+                ...node,
+                valuesForShowingInNode
+            };
             const connections = await NodeConnection_1.default.find({ nodeIdMaster: node.nodeId });
-            restNodes.push({ node, connections: connections.map(c => c.nodeIdChild) });
+            restNodes.push({ node: nodeRow, connections: connections.map(c => c.nodeIdChild) });
         }
         return restNodes;
     }

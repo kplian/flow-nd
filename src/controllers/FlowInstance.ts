@@ -49,7 +49,18 @@ class FlowInstance extends Controller {
               flowInstanceIdProcessing = flowInstance.flowInstanceId;
               const node = await Node.findOne({ where: { actionId: flowInstance.actionId, flowId: flowInstance.flowId }});
               const CNodeInstance = new NodeInstanceController('flow-nd', NodeInstance);
-              await CNodeInstance.RecursiveInstance({ node, flowInstance });
+              try {
+                await CNodeInstance.RecursiveInstance({ node, flowInstance });
+                await manager.update(FlowInstanceModel,
+                    {flowInstanceId:flowInstance.flowInstanceId}, 
+                    {status: 'processed'});
+              } catch(error) {
+                console.log(error);
+                await manager.update(FlowInstanceModel,
+                    {flowInstanceId:flowInstance.flowInstanceId}, 
+                    {status: 'error'});
+              }
+              
               await manager.update(FlowInstanceModel,
                     {flowInstanceId:flowInstance.flowInstanceId}, 
                     {status: 'processed'});

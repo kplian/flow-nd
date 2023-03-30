@@ -157,8 +157,13 @@ class NodeInstance extends Controller {
           // todo if in some transaction there is an error we need to put in some log to error and not try only some times
           for (const nodeConnection of nodeConnectionList) { // todo create transaction for own node
             const nodeRes = await __(Node.findOne(nodeConnection.nodeIdChild))
-
-            await this.RecursiveInstance({ node: nodeRes, flowInstance, resultFromOrigin });
+            try {
+              await this.RecursiveInstance({ node: nodeRes, flowInstance, resultFromOrigin });
+            } catch(error) {
+              await manager.update(NodeInstanceModel, nodeInstance.nodeInstanceId, {
+                status: 'ERROR',
+              });
+            }
           }
 
           //update status from wait to executed

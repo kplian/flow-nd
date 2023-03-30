@@ -49,14 +49,16 @@ let NodeInstance = class NodeInstance extends core_1.Controller {
         const resExecuteView = await core_1.__(typeorm_1.getManager().query(executeView));
         const resultFromOrigin = resExecuteView[0];
         let mergeJson = {};
-        const { actionConfigJson, action: { configJsonTemplate, actionType: { schemaJson } } } = node;
-        if (configJsonTemplate !== '' || actionConfigJson !== '') {
-            const actionConfigJsonObject = actionConfigJson && JSON.parse(lodash_1.default.template(actionConfigJson)(resultFromOrigin));
-            const configJsonTemplateObject = configJsonTemplate && JSON.parse(lodash_1.default.template(configJsonTemplate)(resultFromOrigin));
+        const { actionConfigJson, action: { configJsonTemplate, actionType: { schemaJson }, }, } = node;
+        if (configJsonTemplate !== "" || actionConfigJson !== "") {
+            const actionConfigJsonObject = actionConfigJson &&
+                JSON.parse(lodash_1.default.template(actionConfigJson)(resultFromOrigin));
+            const configJsonTemplateObject = configJsonTemplate &&
+                JSON.parse(lodash_1.default.template(configJsonTemplate)(resultFromOrigin));
             mergeJson = {
                 ...(configJsonTemplateObject || {}),
                 ...(actionConfigJsonObject || {}),
-                __resultFromOrigin: resultFromOrigin
+                __resultFromOrigin: resultFromOrigin,
             };
         }
         let nodeInstance = new NodeInstance_1.default();
@@ -64,24 +66,24 @@ let NodeInstance = class NodeInstance extends core_1.Controller {
         // @ts-ignore
         nodeInstance.nodeId = node.nodeId;
         nodeInstance.runTime = new Date();
-        if (node.action.actionType.isDelay === 'Y') {
+        if (node.action.actionType.isDelay === "Y") {
             const delay = node.delay;
             const typeDelay = node.typeDelay;
             nodeInstance.schedule = moment_1.default().add(delay, typeDelay).toDate();
-            nodeInstance.status = 'WAIT';
+            nodeInstance.status = "WAIT";
             await typeorm_1.getManager().save(NodeInstance_1.default, nodeInstance);
         }
         else {
             if (node.action.actionType.controller) {
-                const data = '';
+                const data = "";
                 const config = {
-                    method: 'post',
+                    method: "post",
                     url: `http://localhost:${process.env.PORT}/api/${node.action.actionType.controller}`,
                     headers: {
-                        'Authorization': '' + process.env.TOKEN_PXP_ND + '',
-                        'Content-Type': 'application/json'
+                        Authorization: "" + process.env.TOKEN_PXP_ND + "",
+                        "Content-Type": "application/json",
                     },
-                    data: mergeJson
+                    data: mergeJson,
                 };
                 // @ts-ignore
                 const resControllerAxios = await core_1.__(axios_1.default(config));
@@ -94,57 +96,81 @@ let NodeInstance = class NodeInstance extends core_1.Controller {
                 const evalCondition = eval(condition);
                 if (evalCondition) {
                     const nodeRes = await core_1.__(Node_1.default.findOne(nodeConnection.nodeIdChild));
-                    await this.RecursiveInstance({ node: nodeRes, flowInstance, resultFromOrigin });
+                    await this.RecursiveInstance({
+                        node: nodeRes,
+                        flowInstance,
+                        resultFromOrigin,
+                    });
                 }
             }
         }
         return {};
     }
     async ProcessDelay(params, manager) {
-        const flag = await common_1.GlobalData.findOne({ data: 'wf_processing_delay_nodes_flag' });
+        const flag = await common_1.GlobalData.findOne({
+            data: "wf_processing_delay_nodes_flag",
+        });
         if (flag) {
-            if (flag.value == 'true') {
-                throw new core_1.PxpError(400, 'Already processing pending flows');
+            if (flag.value == "true") {
+                throw new core_1.PxpError(400, "Already processing pending flows");
             }
-            flag.value = 'true';
+            flag.value = "true";
             await typeorm_1.getManager().save(flag);
             let nodeInstanceIdProcessing = -1;
             try {
-                const maxNodes = await common_1.GlobalData.findOne({ data: 'wf_max_concurrent_delay_process' });
-                const nodeInstanceDelayData = await core_1.__(manager.createQueryBuilder(NodeInstance_1.default, 'ni')
-                    .innerJoin(Node_1.default, 'n', 'n.nodeId = ni.nodeId')
-                    .innerJoin(Action_1.default, 'a', 'a.actionId = n.actionId')
-                    .innerJoin(ActionType_1.default, 'at', 'at.actionTypeId = a.actionTypeId')
+                const maxNodes = await common_1.GlobalData.findOne({
+                    data: "wf_max_concurrent_delay_process",
+                });
+                const nodeInstanceDelayData = await core_1.__(manager
+                    .createQueryBuilder(NodeInstance_1.default, "ni")
+                    .innerJoin(Node_1.default, "n", "n.nodeId = ni.nodeId")
+                    .innerJoin(Action_1.default, "a", "a.actionId = n.actionId")
+                    .innerJoin(ActionType_1.default, "at", "at.actionTypeId = a.actionTypeId")
                     .where("at.isDelay = 'Y' ")
-                    .andWhere('ni.schedule <= :start ', { start: new Date() })
+                    .andWhere("ni.schedule <= :start ", { start: new Date() })
                     .andWhere("ni.status = 'WAIT' ")
                     .limit((maxNodes && maxNodes.value))
                     .getMany());
                 for (const nodeInstance of nodeInstanceDelayData) {
                     //update status from wait to executing
                     await core_1.__(manager.update(NodeInstance_1.default, nodeInstance.nodeInstanceId, {
-                        status: 'EXECUTING',
+                        status: "EXECUTING",
                     }));
-                    const nodeConnectionList = await core_1.__(NodeConnection_1.default.find({ where: { nodeIdMaster: nodeInstance.nodeId } }));
+                    const nodeConnectionList = await core_1.__(NodeConnection_1.default.find({
+                        where: { nodeIdMaster: nodeInstance.nodeId },
+                    }));
                     const flowInstance = await core_1.__(FlowInstance_1.default.findOne(nodeInstance.flowInstanceId));
                     const resultFromOrigin = JSON.parse(flowInstance.resultFromOrigen);
                     // todo if in some transaction there is an error we need to put in some log to error and not try only some times
-                    for (const nodeConnection of nodeConnectionList) { // todo create transaction for own node
+                    for (const nodeConnection of nodeConnectionList) {
+                        // todo create transaction for own node
                         const nodeRes = await core_1.__(Node_1.default.findOne(nodeConnection.nodeIdChild));
-                        await this.RecursiveInstance({ node: nodeRes, flowInstance, resultFromOrigin });
+                        try {
+                            await this.RecursiveInstance({
+                                node: nodeRes,
+                                flowInstance,
+                                resultFromOrigin,
+                            });
+                            //update status from wait to executed
+                            await core_1.__(manager.update(NodeInstance_1.default, nodeInstance.nodeInstanceId, {
+                                status: "EXECUTED",
+                            }));
+                        }
+                        catch (error) {
+                            console.log(error);
+                            await manager.update(NodeInstance_1.default, nodeInstance.nodeInstanceId, {
+                                status: "ERROR",
+                            });
+                        }
                     }
-                    //update status from wait to executed
-                    await core_1.__(manager.update(NodeInstance_1.default, nodeInstance.nodeInstanceId, {
-                        status: 'EXECUTED',
-                    }));
                 }
             }
             catch (error) {
-                flag.value = 'false';
+                flag.value = "false";
                 await typeorm_1.getManager().save(flag);
-                throw new core_1.PxpError(400, 'Error processing node: ' + nodeInstanceIdProcessing);
+                throw new core_1.PxpError(400, "Error processing node: " + nodeInstanceIdProcessing);
             }
-            flag.value = 'false';
+            flag.value = "false";
             await typeorm_1.getManager().save(flag);
         }
         return { success: true };
@@ -152,7 +178,7 @@ let NodeInstance = class NodeInstance extends core_1.Controller {
 };
 __decorate([
     core_1.Post(),
-    core_1.DbSettings('Orm'),
+    core_1.DbSettings("Orm"),
     core_1.ReadOnly(false),
     core_1.Log(true),
     __metadata("design:type", Function),
@@ -160,6 +186,6 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], NodeInstance.prototype, "ProcessDelay", null);
 NodeInstance = __decorate([
-    core_1.Model('flow-nd/NodeInstance')
+    core_1.Model("flow-nd/NodeInstance")
 ], NodeInstance);
 exports.default = NodeInstance;

@@ -50,9 +50,15 @@ class FlowInstance extends core_1.Controller {
                     flowInstanceIdProcessing = flowInstance.flowInstanceId;
                     const node = await Node_1.default.findOne({ where: { actionId: flowInstance.actionId, flowId: flowInstance.flowId } });
                     const CNodeInstance = new NodeInstance_1.default('flow-nd', NodeInstance_2.default);
-                    await CNodeInstance.RecursiveInstance({ node, flowInstance });
-                    flowInstance.status = 'processed';
-                    await manager.save(flowInstance);
+                    try {
+                        await CNodeInstance.RecursiveInstance({ node, flowInstance });
+                        await manager.update(FlowInstance_1.default, { flowInstanceId: flowInstance.flowInstanceId }, { status: 'processed' });
+                    }
+                    catch (error) {
+                        console.log(error);
+                        await manager.update(FlowInstance_1.default, { flowInstanceId: flowInstance.flowInstanceId }, { status: 'error' });
+                    }
+                    await manager.update(FlowInstance_1.default, { flowInstanceId: flowInstance.flowInstanceId }, { status: 'processed' });
                 }
             }
             catch (error) {

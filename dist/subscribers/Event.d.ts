@@ -12,8 +12,8 @@
  * Created at     : 2021-07-08 12:55:38
  * Last modified  :
  */
-import { EntitySubscriberInterface, InsertEvent } from 'typeorm';
-import EventModel from '../entity/Event';
+import { EntitySubscriberInterface, InsertEvent } from "typeorm";
+import EventModel from "../entity/Event";
 export declare class Event implements EntitySubscriberInterface<EventModel> {
     listenTo(): typeof EventModel;
     afterInsert(event: InsertEvent<EventModel>): Promise<void>;

@@ -29,7 +29,7 @@ class Flow extends Controller {
   @DbSettings('Orm')
   @ReadOnly(true)
   @Log(true)
-  async get(params: Record<string, any>): Promise<unknown> {
+  async get(params: Record<string, any>): Promise<unknown> { console.log ("aaaaaaa................")
     const nodes = await NodeModel.find({ flowId: params.flowId });
     const restNodes = [];
     for (let node of nodes) {
@@ -108,6 +108,33 @@ class Flow extends Controller {
 
 
     return { flowId : insertNewFlow.flowId };
+  }
+
+
+  @Post()
+  @DbSettings('Orm')
+  @ReadOnly(false)
+  @Log(true)
+  async deleteFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+console.log("entra a delete");
+    // we need clone the flow selected
+    let dataFlow = await __(FlowModel.findOne(params.flowId));
+    console.log ('xxxxx:', dataFlow)
+    //const { flowId, createdAt, modifiedAt, nodes, ...flowToCopy} = dataFlow;
+    dataFlow.isActive = 0 as number;
+    newFlow.enabled = 'N';
+    const updFlow = await __(manager.save(updPackage));
+console.log ('res: ', updFlow);
+
+    // create the nodes
+
+    // get the first node "the trigger node"
+    /*const dataNode = await NodeModel.findOne({ where: {flowId: params.flowId }, order: {nodeId: "ASC"}});
+
+    dataNode && await this.copyNode(dataNode, insertNewFlow.flowId, manager);*/
+
+
+    return { success : true };
   }
 }
 

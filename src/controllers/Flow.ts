@@ -1,18 +1,19 @@
 /**
- * Effex 2021
- *
- * MIT
- *
- * Flow Controller
- *
- * @summary Flow Controller
- * @author Jaime Figueroa
- *
- * Created at     : 2021-07-08 12:55:38
- * Last modified  :
+ * Copyright(c) 2021 Qorus Inc
+ * * All rights reserved
+ * * ******************************************************************************
+ * * NAME: Flow.ts
+ * * DEVELOPER: Jaime Figueroa
+ * * DESCRIPTION: Flow Controller
+ * * REVISIONS:
+ * * Date             Change ID     Author Description
+ * * -------------- ----------- -------------- ------------------------------------
+ * 08-Jul-2021                  Jaime Rivera           Created
+ * 18-Jul-2023    SP28JUL23     Mercedes Zambrana      Add deleteFlow, saveFlowName, duplicateFlow
+ * ******************************************************************************
  */
 
-import { EntityManager, getManager } from 'typeorm';
+import { EntityManager, getManager, In } from 'typeorm';
 
 import {
   Controller,
@@ -21,6 +22,7 @@ import {
 import NodeModel from '../entity/Node';
 import NodeConnectionModel from '../entity/NodeConnection';
 import FlowModel from '../entity/Flow';
+import FlowInstanceModel from '../entity/FlowInstance';
 
 @Model('flow-nd/Flow')
 class Flow extends Controller {
@@ -84,6 +86,8 @@ class Flow extends Controller {
   }
 
 
+
+
   @Post()
   @DbSettings('Orm')
   @ReadOnly(false)
@@ -109,6 +113,132 @@ class Flow extends Controller {
 
     return { flowId : insertNewFlow.flowId };
   }
+
+  @Post()
+  @DbSettings('Orm')
+  @ReadOnly(false)
+  @Log(true)
+  async deleteFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+
+    let dataFlow = await __(FlowModel.findOne(params.flowId));
+
+
+    if (dataFlow){
+      dataFlow.isActive = 0 as number;
+      dataFlow.enabled = 'N';
+      const updFlow = await __(manager.save(dataFlow));
+
+      if (updFlow){
+        let flowInstance =  `UPDATE twf_flow_instance SET
+            is_active = 'N' WHERE flow_id = ${updFlow.flowId}`;
+        await manager.query(flowInstance);
+
+
+        let flowNode = `UPDATE twf_node SET
+            is_active = 'N' WHERE flow_id = ${updFlow.flowId}`;
+        await manager.query(flowNode);
+
+
+        const nodesToInact = await manager.find(NodeModel, { flowId: updFlow.flowId });
+        const originalNodeIds = nodesToInact.map((node) => node.nodeId);
+
+        const connectionsToInact = await manager.find(NodeConnectionModel, {
+          where: { nodeIdChild: In(originalNodeIds) } // Suponiendo que originalNodeIds contiene los IDs de los nodos originales que deseas duplicar
+        });
+
+        const originalNodeCIds = connectionsToInact.map((node) => node.nodeConnectionId);
+
+
+        let flowNodeC = `UPDATE twf_node_connection SET
+            is_active = 'N' WHERE node_connection_id in ( ${originalNodeCIds})`;
+        await manager.query(flowNodeC);
+
+        return { success : true };
+      }else{
+        return { success : false };
+      }
+
+    }else{
+      return { success : false };
+    }
+
+  }
+
+
+
+  @Post()
+  @DbSettings('Orm')
+  @ReadOnly(false)
+  @Log(true)
+  async saveFlowName(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+
+    let dataFlow = await __(FlowModel.findOne(params.flowId));
+    if (dataFlow){
+      dataFlow.name = params.name;
+      const updFlow = await __(manager.save(dataFlow));
+
+      return { success : true };
+    }else{
+      return { success : false };
+    }
+
+  }
+
+
+
+  @Post()
+  @DbSettings('Orm')
+  @ReadOnly(false)
+  @Log(true)
+  async duplicateFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+
+    const flowData = await manager.findOne(FlowModel, params.flowId);
+    const flowToClone = {
+      ...flowData,
+      flowId: undefined as any,
+      nodes: [] as any[],
+      createdAt: undefined as any
+    }
+
+    const flowDataClone:any = await manager.save(FlowModel, {...flowToClone, name: `${flowData.name} Copy`});
+
+
+
+
+    const nodesToDuplicate = await manager.find(NodeModel, { flowId: flowData?.flowId });
+    const originalNodeIds = nodesToDuplicate.map((node) => node.nodeId);
+    const duplicatedNodes = nodesToDuplicate.map((node) => {
+      const duplicatedNode = manager.create(NodeModel, { ...node, nodeId:undefined as any });
+      duplicatedNode.flowId =flowDataClone.flowId;
+      return duplicatedNode;
+    }); const savedNodes = await manager.save(duplicatedNodes);
+
+
+    const newNodeIds = savedNodes.map((node) => node.nodeId);
+
+
+    const connectionsToDuplicate = await manager.find(NodeConnectionModel, {
+      where: { nodeIdChild: In(originalNodeIds) }
+    });
+
+
+    const duplicatedConnections = newNodeIds.map((nodeId, index) => {
+
+      const duplicatedConnection = manager.create(NodeConnectionModel, {
+        nodeConnectionId : undefined,
+        nodeIdMaster: index === 0 ? null : newNodeIds[index - 1],
+        nodeIdChild: nodeId,
+      });
+      return duplicatedConnection;
+    });
+
+    await manager.save(duplicatedConnections);
+
+
+
+ return {success:true}
+  }
+
 }
 
 export default Flow;

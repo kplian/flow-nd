@@ -23,6 +23,8 @@ import NodeModel from '../entity/Node';
 import NodeConnectionModel from '../entity/NodeConnection';
 import FlowModel from '../entity/Flow';
 import FlowInstanceModel from '../entity/FlowInstance';
+import ActionModel from '../entity/Action';
+
 
 @Model('flow-nd/Flow')
 class Flow extends Controller {
@@ -239,6 +241,108 @@ class Flow extends Controller {
  return {success:true}
   }
 
+
+
+  @Post()
+  @DbSettings('Orm')
+  @ReadOnly(false)
+  @Log(true)
+  async saveFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+
+    let nodeRefIds = params.board.columns['2-column-nodes-configured'].taskIds;
+    let nodes = params.board.tasks;
+    let masterId = null;
+    let id = null;
+    let flowId = null;
+
+    let taskIds:any = [];
+    for (const nodeId of nodeRefIds) {
+      // console.log ('node:',nodes[`${nodeId}`]);
+      if (nodes[`${nodeId}`]) {
+        flowId = nodes[`${nodeId}`].flowId;
+        if (nodeId != 'new') {
+          id = parseInt(nodeId.split("-")[1]);
+          taskIds.push(id);
+        }
+
+
+        const connectionsToDel = await manager.find(NodeConnectionModel, {
+          where: {nodeIdChild: id}
+        });
+        if (connectionsToDel) {
+          //console.log("hay para eliminar---->", connectionsToDel);
+          const originalNodeCIds = connectionsToDel.map((node: any) => node.nodeConnectionId);
+          //console.log("eliminando: ", originalNodeCIds);
+
+          let flowNodeC = await getManager().query(`DELETE
+                                                    from twf_node_connection
+                                                    WHERE node_connection_id = ${originalNodeCIds}`);
+
+        }
+      }
+    }
+
+    //If there are some nodes in node_connections after delete all records sent, to inactive node
+    let connectNoDel = await getManager().query(`SELECT n.node_id
+                                                    from twf_node_connection nd 
+                                                    inner join twf_node n on n.node_id = nd.node_id_child
+                                                    WHERE n.flow_id= ${flowId}`);
+
+    const currentNodesIds = connectNoDel.map((record: { node_id: number }) => record.node_id);
+
+    // Get nodes to remove
+    const nodesToRemove = currentNodesIds.filter((nodeId: number) => !taskIds.includes(nodeId.toString()));
+
+    // Inactive nodes
+    if (nodesToRemove.length > 0) {
+      const delNodeConnect = await manager.delete(NodeConnectionModel,{ nodeIdChild: nodesToRemove[0]});
+      if (delNodeConnect) {
+        let dNode = `UPDATE twf_node SET
+            is_active = 'N' WHERE node_id = ${nodesToRemove[0]}`;
+        await manager.query(dNode);
+      }
+
+    }
+
+
+
+
+    for (const nodeId of nodeRefIds) {
+      if (nodes[`${nodeId}`]) {
+        if(nodeId==='new' ){
+          //get information about Action
+          const newAction = await ActionModel.findOne({ code: nodes[`${nodeId}`].action.code });
+
+          const newNode = manager.create(NodeModel, {
+            nodeId : undefined,
+            flowId: nodes[`${nodeId}`].flowId,
+            isInit: 'N',
+            actionId: newAction.actionId
+          });
+          const saveNode = await manager.save(newNode);
+          id = saveNode.nodeId;
+        }else{
+          id = parseInt(nodeId.split("-")[1]);
+        }
+
+
+       //save in node and node_connection
+          const newConnection = manager.create(NodeConnectionModel, {
+            nodeConnectionId : undefined,
+            nodeIdMaster: masterId,
+            nodeIdChild: id,
+          });
+          masterId= id;
+         const savedNodes = await manager.save(newConnection);
+       // }
+
+      }
+    }
+
+    return {success:true}
+  }
+  
+  
 }
 
 export default Flow;

@@ -26,5 +26,6 @@ declare class Flow extends Controller {
     duplicateFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown>;
     getFlowRender(params: Record<string, any>): Promise<unknown>;
     sortNodesByConnections(nodes: any[], connections: any[]): any[];
+    saveFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown>;
 }
 export default Flow;

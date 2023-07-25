@@ -270,6 +270,81 @@ let Flow = class Flow extends core_1.Controller {
         });
         return sortedNodes;
     }
+    async saveFlow(params, manager) {
+        let nodeRefIds = params.board.columns['2-column-nodes-configured'].taskIds;
+        let nodes = params.board.tasks;
+        let masterId = null;
+        let id = null;
+        let flowId = null;
+        let taskIds = [];
+        for (const nodeId of nodeRefIds) {
+            // console.log ('node:',nodes[`${nodeId}`]);
+            if (nodes[`${nodeId}`]) {
+                flowId = nodes[`${nodeId}`].flowId;
+                if (nodeId != 'new') {
+                    id = parseInt(nodeId.split("-")[1]);
+                    taskIds.push(id);
+                }
+                const connectionsToDel = await manager.find(NodeConnection_1.default, {
+                    where: { nodeIdChild: id }
+                });
+                if (connectionsToDel) {
+                    //console.log("hay para eliminar---->", connectionsToDel);
+                    const originalNodeCIds = connectionsToDel.map((node) => node.nodeConnectionId);
+                    //console.log("eliminando: ", originalNodeCIds);
+                    let flowNodeC = await typeorm_1.getManager().query(`DELETE
+                                                    from twf_node_connection
+                                                    WHERE node_connection_id = ${originalNodeCIds}`);
+                }
+            }
+        }
+        //If there are some nodes in node_connections after delete all records sent, to inactive node
+        let connectNoDel = await typeorm_1.getManager().query(`SELECT n.node_id
+                                                    from twf_node_connection nd 
+                                                    inner join twf_node n on n.node_id = nd.node_id_child
+                                                    WHERE n.flow_id= ${flowId}`);
+        const currentNodesIds = connectNoDel.map((record) => record.node_id);
+        // Get nodes to remove
+        const nodesToRemove = currentNodesIds.filter((nodeId) => !taskIds.includes(nodeId.toString()));
+        // Inactive nodes
+        if (nodesToRemove.length > 0) {
+            const delNodeConnect = await manager.delete(NodeConnection_1.default, { nodeIdChild: nodesToRemove[0] });
+            if (delNodeConnect) {
+                let dNode = `UPDATE twf_node SET
+            is_active = 'N' WHERE node_id = ${nodesToRemove[0]}`;
+                await manager.query(dNode);
+            }
+        }
+        for (const nodeId of nodeRefIds) {
+            if (nodes[`${nodeId}`]) {
+                if (nodeId === 'new') {
+                    //get information about Action
+                    const newAction = await Action_1.default.findOne({ code: nodes[`${nodeId}`].action.code });
+                    const newNode = manager.create(Node_1.default, {
+                        nodeId: undefined,
+                        flowId: nodes[`${nodeId}`].flowId,
+                        isInit: 'N',
+                        actionId: newAction.actionId
+                    });
+                    const saveNode = await manager.save(newNode);
+                    id = saveNode.nodeId;
+                }
+                else {
+                    id = parseInt(nodeId.split("-")[1]);
+                }
+                //save in node and node_connection
+                const newConnection = manager.create(NodeConnection_1.default, {
+                    nodeConnectionId: undefined,
+                    nodeIdMaster: masterId,
+                    nodeIdChild: id,
+                });
+                masterId = id;
+                const savedNodes = await manager.save(newConnection);
+                // }
+            }
+        }
+        return { success: true };
+    }
 };
 __decorate([
     core_1.Get(),
@@ -325,6 +400,15 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], Flow.prototype, "getFlowRender", null);
+__decorate([
+    core_1.Post(),
+    core_1.DbSettings('Orm'),
+    core_1.ReadOnly(false),
+    core_1.Log(true),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
+    __metadata("design:returntype", Promise)
+], Flow.prototype, "saveFlow", null);
 Flow = __decorate([
     core_1.Model('flow-nd/Flow')
 ], Flow);

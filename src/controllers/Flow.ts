@@ -20,6 +20,7 @@ import {
   Model, __, Log, Post, DbSettings, ReadOnly, Get
 } from '@pxp-nd/core';
 import NodeModel from '../entity/Node';
+import ActionModel from '../entity/Action';
 import NodeConnectionModel from '../entity/NodeConnection';
 import FlowModel from '../entity/Flow';
 import FlowInstanceModel from '../entity/FlowInstance';
@@ -237,6 +238,135 @@ class Flow extends Controller {
 
 
  return {success:true}
+  }
+
+  @Get()
+  @DbSettings('Orm')
+  @ReadOnly(true)
+  @Log(true)
+  async getFlowRender(params: Record<string, any>): Promise<unknown> {
+    
+    let actions = await getManager()
+        .createQueryBuilder(ActionModel, "a")
+        .select([
+          "a.actionId",
+          "a.code",
+          "a.name",
+          "a.description",
+          "at.name"
+        ])
+        .innerJoin("a.actionType", "at")
+        .where(`a.isActive = 1 and a.hidden = 'N'`)
+        .getMany();
+    
+    const connections = await getManager()
+        .createQueryBuilder(NodeConnectionModel, "nc")
+        .select([
+          "nc.nodeIdMaster",
+          "nc.nodeIdChild",
+        ])
+        .innerJoin("nc.childNode", "cn")
+        .where(`cn.flowId = :flowId`, { flowId: params.flowId as number })
+        .getMany();
+
+    const nodes = await getManager()
+        .createQueryBuilder(NodeModel, "n")
+        .select([
+          "n.nodeId",
+          "n.flowId",
+          "a.code",
+          "a.name",
+          "a.description",
+        ])
+        .innerJoin("n.action", "a")
+        .where(`n.flowId = :flowId`, { flowId: params.flowId as number })
+        .getMany();
+
+    let sortedNodes = this.sortNodesByConnections(nodes, connections);
+
+    actions.forEach((item:any) => {
+      item.actionId = `action-${item.actionId}`;
+    });
+
+    sortedNodes.forEach((item:any) => {
+      item.nodeId = `node-${item.nodeId}`;
+    });
+
+    const actionIds = actions.map((item:any) =>item.actionId);
+    const nodeIds = sortedNodes.map((item:any) =>item.nodeId);
+
+    sortedNodes = sortedNodes.map(({ nodeId, ...rest }) => {
+      return { id: nodeId, ...rest };
+    });
+
+    const modActions = actions.map(({ actionId, ...rest }) => {
+      return { id: actionId, type: 'template', ...rest };
+    });
+
+    const tasks = [...modActions, ...sortedNodes];
+
+    const tasksObject = tasks.reduce((acc, obj) => {
+      acc[obj.id] = obj;
+      return acc;
+    }, {});
+
+    let response: any = {
+      board: {
+        columns: {
+          "1-column-config-nodes": {
+            id: "1-column-config-nodes",
+            name: "Add Nodes",
+            taskIds: actionIds,
+          },
+          "2-column-nodes-configured": {
+            id: "2-column-nodes-configured",
+            name: "Test Flow",
+            taskIds: nodeIds,
+          }
+        },
+        tasks: tasksObject,
+        ordered: [
+          "1-column-config-nodes",
+          "2-column-nodes-configured"
+       ],
+      }
+
+    };
+    return response;
+  }
+
+  sortNodesByConnections(nodes: any[], connections: any[]): any[] {
+    const nodeMap: Map<number, Node> = new Map();
+    nodes.forEach((node) => nodeMap.set(node.nodeId, node));
+  
+    const sortedNodes: Node[] = [];
+    const visitedNodes: Set<number> = new Set();
+  
+    function dfs(nodeId: number) {
+      visitedNodes.add(nodeId);
+      const node = nodeMap.get(nodeId);
+      if (node) {
+        sortedNodes.push(node);
+      }
+  
+      const connectedNodes = connections.filter(
+        (connection) => connection.nodeIdMaster === nodeId
+      );
+  
+      connectedNodes.forEach((connection) => {
+        if (!visitedNodes.has(connection.nodeIdChild)) {
+          dfs(connection.nodeIdChild);
+        }
+      });
+    }
+  
+    connections.forEach((connection) => {
+      if (connection.nodeIdMaster === null && !visitedNodes.has(connection.nodeIdChild)) {
+        dfs(connection.nodeIdChild);
+      }
+    });
+  
+    return sortedNodes;
   }
 
 }

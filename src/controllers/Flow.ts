@@ -24,6 +24,8 @@ import ActionModel from '../entity/Action';
 import NodeConnectionModel from '../entity/NodeConnection';
 import FlowModel from '../entity/Flow';
 import FlowInstanceModel from '../entity/FlowInstance';
+import ActionModel from '../entity/Action';
+
 
 
 @Model('flow-nd/Flow')
@@ -241,6 +243,7 @@ class Flow extends Controller {
  return {success:true}
   }
 
+
   @Get()
   @DbSettings('Orm')
   @ReadOnly(true)
@@ -371,6 +374,7 @@ class Flow extends Controller {
   }
 
 
+
   @Post()
   @DbSettings('Orm')
   @ReadOnly(false)
@@ -393,6 +397,7 @@ class Flow extends Controller {
           taskIds.push(id);
 
 
+
           const connectionsToDel = await manager.find(NodeConnectionModel, {
             where: {nodeIdChild: id}
           });
@@ -407,6 +412,7 @@ class Flow extends Controller {
                                                       WHERE node_connection_id = ${originalNodeCIds}`);
 
           }
+
         }
       }
     }
@@ -455,6 +461,7 @@ class Flow extends Controller {
         }
 
 
+
         //save in node and node_connection
         const newConnection = manager.create(NodeConnectionModel, {
           nodeConnectionId : undefined,
@@ -465,12 +472,18 @@ class Flow extends Controller {
         const savedNodes = await manager.save(newConnection);
         // }
 
+
       }
     }
 
     return {success:true}
   }
+<<<<<<< HEAD
 
+=======
+  
+  
+>>>>>>> db31f85ac0862b5ff5418e413c20023dd39583a6
 }
 
 export default Flow;

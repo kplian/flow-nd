@@ -277,23 +277,28 @@ let Flow = class Flow extends core_1.Controller {
         let id = null;
         let flowId = null;
         let taskIds = [];
-        for (const nodeId of nodeRefIds) {
-            // console.log ('node:',nodes[`${nodeId}`]);
-            if (nodes[`${nodeId}`]) {
-                flowId = nodes[`${nodeId}`].flowId;
-                if (nodeId != 'new') {
-                    id = parseInt(nodeId.split("-")[1]);
-                    taskIds.push(id);
-                    const connectionsToDel = await manager.find(NodeConnection_1.default, {
-                        where: { nodeIdChild: id }
-                    });
-                    if (connectionsToDel) {
-                        //console.log("hay para eliminar---->", connectionsToDel);
-                        const originalNodeCIds = connectionsToDel.map((node) => node.nodeConnectionId);
-                        //console.log("eliminando: ", originalNodeCIds);
-                        let flowNodeC = await typeorm_1.getManager().query(`DELETE
+        if (nodeRefIds.length === 0) {
+            flowId = params.board.columns['2-column-nodes-configured'].flowId;
+        }
+        else {
+            for (const nodeId of nodeRefIds) {
+                // console.log ('node:',nodes[`${nodeId}`]);
+                if (nodes[`${nodeId}`]) {
+                    flowId = nodes[`${nodeId}`].flowId;
+                    if (nodeId != 'new') {
+                        id = parseInt(nodeId.split("-")[1]);
+                        taskIds.push(id);
+                        const connectionsToDel = await manager.find(NodeConnection_1.default, {
+                            where: { nodeIdChild: id }
+                        });
+                        if (connectionsToDel) {
+                            //console.log("hay para eliminar---->", connectionsToDel);
+                            const originalNodeCIds = connectionsToDel.map((node) => node.nodeConnectionId);
+                            //console.log("eliminando: ", originalNodeCIds);
+                            let flowNodeC = await typeorm_1.getManager().query(`DELETE
                                                       from twf_node_connection
                                                       WHERE node_connection_id = ${originalNodeCIds}`);
+                        }
                     }
                 }
             }
@@ -315,32 +320,36 @@ let Flow = class Flow extends core_1.Controller {
                 await manager.query(dNode);
             }
         }
-        for (const nodeId of nodeRefIds) {
-            if (nodes[`${nodeId}`]) {
-                if (nodeId === 'new') {
-                    //get information about Action
-                    const newAction = await Action_1.default.findOne({ code: nodes[`${nodeId}`].action.code });
-                    const newNode = manager.create(Node_1.default, {
-                        nodeId: undefined,
-                        flowId: nodes[`${nodeId}`].flowId,
-                        isInit: 'N',
-                        actionId: newAction.actionId
+        if (nodeRefIds.length === 0) {
+        }
+        else {
+            for (const nodeId of nodeRefIds) {
+                if (nodes[`${nodeId}`]) {
+                    if (nodeId === 'new') {
+                        //get information about Action
+                        const newAction = await Action_1.default.findOne({ code: nodes[`${nodeId}`].action.code });
+                        const newNode = manager.create(Node_1.default, {
+                            nodeId: undefined,
+                            flowId: nodes[`${nodeId}`].flowId,
+                            isInit: 'N',
+                            actionId: newAction.actionId
+                        });
+                        const saveNode = await manager.save(newNode);
+                        id = saveNode.nodeId;
+                    }
+                    else {
+                        id = parseInt(nodeId.split("-")[1]);
+                    }
+                    //save in node and node_connection
+                    const newConnection = manager.create(NodeConnection_1.default, {
+                        nodeConnectionId: undefined,
+                        nodeIdMaster: masterId,
+                        nodeIdChild: id,
                     });
-                    const saveNode = await manager.save(newNode);
-                    id = saveNode.nodeId;
+                    masterId = id;
+                    const savedNodes = await manager.save(newConnection);
+                    // }
                 }
-                else {
-                    id = parseInt(nodeId.split("-")[1]);
-                }
-                //save in node and node_connection
-                const newConnection = manager.create(NodeConnection_1.default, {
-                    nodeConnectionId: undefined,
-                    nodeIdMaster: masterId,
-                    nodeIdChild: id,
-                });
-                masterId = id;
-                const savedNodes = await manager.save(newConnection);
-                // }
             }
         }
         return { success: true };

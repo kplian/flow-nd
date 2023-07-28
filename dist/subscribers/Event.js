@@ -36,7 +36,6 @@ let Event = class Event {
         return Event_1.default;
     }
     async afterInsert(event) {
-        console.log("entra");
         //todo investigate  replace variables into condition
         const newEvent = event.entity;
         const node = await core_1.__(Node_1.default.find({ where: { actionId: newEvent.actionId, isActive: 1 } }));
@@ -46,7 +45,7 @@ let Event = class Event {
             const executeView = `select * from ${originName} where ${originKey} = ${newEvent.dataId}`;
             const resExecuteView = await typeorm_1.getManager().query(executeView);
             const flow = await core_1.__(Flow_1.default.findOne({ where: { flowId: n.flowId, isActive: 1 } }));
-            if (flow.vendorId == resExecuteView[0].vendor_id &&
+            if (flow && flow.vendorId == resExecuteView[0].vendor_id &&
                 (await this.checkConditions(resExecuteView[0], n.flowId, newEvent.actionId))) {
                 //now check all conditions
                 let flowInstance = new FlowInstance_1.default();
@@ -62,9 +61,9 @@ let Event = class Event {
     }
     async checkConditions(viewData, flowId, actionId) {
         const action = await Action_1.default.findOne(actionId);
-        const node = await Node_1.default.findOne({ where: { actionId, flowId } });
+        const node = await Node_1.default.findOne({ where: { actionId, flowId, isActive: 1 } });
         let res = true;
-        if (action.eventConfig && node.actionConfigJson) {
+        if (node && action.eventConfig && node.actionConfigJson) {
             const eventConfig = JSON.parse(action.eventConfig);
             const actionConfigJson = JSON.parse(node.actionConfigJson);
             if (eventConfig.filters) {

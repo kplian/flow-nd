@@ -32,7 +32,6 @@ export class Event implements EntitySubscriberInterface<EventModel> {
   }
 
   async afterInsert(event: InsertEvent<EventModel>) {
-    console.log("entra");
     //todo investigate  replace variables into condition
     const newEvent = event.entity;
     const node = await __(
@@ -48,7 +47,7 @@ export class Event implements EntitySubscriberInterface<EventModel> {
       const resExecuteView = await getManager().query(executeView);
       const flow = await __(Flow.findOne({ where: { flowId: n.flowId, isActive: 1 } }));
       if (
-        flow.vendorId == resExecuteView[0].vendor_id &&
+        flow && flow.vendorId == resExecuteView[0].vendor_id &&
         (await this.checkConditions(
           resExecuteView[0],
           n.flowId,
@@ -76,10 +75,10 @@ export class Event implements EntitySubscriberInterface<EventModel> {
     actionId: number
   ) {
     const action = await Action.findOne(actionId);
-    const node = await Node.findOne({ where: { actionId, flowId } });
+    const node = await Node.findOne({ where: { actionId, flowId, isActive: 1 } });
 
     let res = true;
-    if (action.eventConfig && node.actionConfigJson) {
+    if (node && action.eventConfig && node.actionConfigJson) {
       const eventConfig = JSON.parse(action.eventConfig);
       const actionConfigJson = JSON.parse(node.actionConfigJson);
       if (eventConfig.filters) {

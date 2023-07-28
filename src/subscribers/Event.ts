@@ -36,7 +36,7 @@ export class Event implements EntitySubscriberInterface<EventModel> {
     //todo investigate  replace variables into condition
     const newEvent = event.entity;
     const node = await __(
-      Node.find({ where: { actionId: newEvent.actionId } })
+      Node.find({ where: { actionId: newEvent.actionId, isActive: 1 } })
     );
 
     for (const n of node) {
@@ -46,7 +46,7 @@ export class Event implements EntitySubscriberInterface<EventModel> {
       } = n;
       const executeView = `select * from ${originName} where ${originKey} = ${newEvent.dataId}`;
       const resExecuteView = await getManager().query(executeView);
-      const flow = await __(Flow.findOne({ where: { flowId: n.flowId } }));
+      const flow = await __(Flow.findOne({ where: { flowId: n.flowId, isActive: 1 } }));
       if (
         flow.vendorId == resExecuteView[0].vendor_id &&
         (await this.checkConditions(

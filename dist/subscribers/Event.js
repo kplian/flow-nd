@@ -39,13 +39,13 @@ let Event = class Event {
         console.log("entra");
         //todo investigate  replace variables into condition
         const newEvent = event.entity;
-        const node = await core_1.__(Node_1.default.find({ where: { actionId: newEvent.actionId } }));
+        const node = await core_1.__(Node_1.default.find({ where: { actionId: newEvent.actionId, isActive: 1 } }));
         for (const n of node) {
             //get data of view
             const { action: { originName, originKey }, } = n;
             const executeView = `select * from ${originName} where ${originKey} = ${newEvent.dataId}`;
             const resExecuteView = await typeorm_1.getManager().query(executeView);
-            const flow = await core_1.__(Flow_1.default.findOne({ where: { flowId: n.flowId } }));
+            const flow = await core_1.__(Flow_1.default.findOne({ where: { flowId: n.flowId, isActive: 1 } }));
             if (flow.vendorId == resExecuteView[0].vendor_id &&
                 (await this.checkConditions(resExecuteView[0], n.flowId, newEvent.actionId))) {
                 //now check all conditions

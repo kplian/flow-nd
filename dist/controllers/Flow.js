@@ -138,35 +138,42 @@ let Flow = class Flow extends core_1.Controller {
     }
     async duplicateFlow(params, manager) {
         const flowData = await manager.findOne(Flow_1.default, params.flowId);
-        const flowToClone = {
-            ...flowData,
-            flowId: undefined,
-            nodes: [],
-            createdAt: undefined
-        };
-        const flowDataClone = await manager.save(Flow_1.default, { ...flowToClone, name: `${flowData.name} Copy` });
-        const nodesToDuplicate = await manager.find(Node_1.default, { flowId: flowData === null || flowData === void 0 ? void 0 : flowData.flowId });
-        const originalNodeIds = nodesToDuplicate.map((node) => node.nodeId);
-        const duplicatedNodes = nodesToDuplicate.map((node) => {
-            const duplicatedNode = manager.create(Node_1.default, { ...node, nodeId: undefined });
-            duplicatedNode.flowId = flowDataClone.flowId;
-            return duplicatedNode;
-        });
-        const savedNodes = await manager.save(duplicatedNodes);
-        const newNodeIds = savedNodes.map((node) => node.nodeId);
-        const connectionsToDuplicate = await manager.find(NodeConnection_1.default, {
-            where: { nodeIdChild: typeorm_1.In(originalNodeIds) }
-        });
-        const duplicatedConnections = newNodeIds.map((nodeId, index) => {
-            const duplicatedConnection = manager.create(NodeConnection_1.default, {
-                nodeConnectionId: undefined,
-                nodeIdMaster: index === 0 ? null : newNodeIds[index - 1],
-                nodeIdChild: nodeId,
-            });
-            return duplicatedConnection;
-        });
-        await manager.save(duplicatedConnections);
-        return { success: true };
+        if (flowData) {
+            const flowToClone = {
+                ...flowData,
+                flowId: undefined,
+                nodes: [],
+                createdAt: undefined
+            };
+            const flowDataClone = await manager.save(Flow_1.default, { ...flowToClone, name: `${flowData.name} Copy` });
+            const nodesToDuplicate = await manager.find(Node_1.default, { flowId: flowData === null || flowData === void 0 ? void 0 : flowData.flowId });
+            if (nodesToDuplicate) {
+                const originalNodeIds = nodesToDuplicate.map((node) => node.nodeId);
+                const duplicatedNodes = nodesToDuplicate.map((node) => {
+                    const duplicatedNode = manager.create(Node_1.default, { ...node, nodeId: undefined });
+                    duplicatedNode.flowId = flowDataClone.flowId;
+                    return duplicatedNode;
+                });
+                const savedNodes = await manager.save(duplicatedNodes);
+                const newNodeIds = savedNodes.map((node) => node.nodeId);
+                const connectionsToDuplicate = await manager.find(NodeConnection_1.default, {
+                    where: { nodeIdChild: typeorm_1.In(originalNodeIds) }
+                });
+                const duplicatedConnections = newNodeIds.map((nodeId, index) => {
+                    const duplicatedConnection = manager.create(NodeConnection_1.default, {
+                        nodeConnectionId: undefined,
+                        nodeIdMaster: index === 0 ? null : newNodeIds[index - 1],
+                        nodeIdChild: nodeId,
+                    });
+                    return duplicatedConnection;
+                });
+                await manager.save(duplicatedConnections);
+            }
+            return { success: true };
+        }
+        else {
+            return { success: false, "respuesta": "No Flow" };
+        }
     }
     async getFlowRender(params) {
         let actions = await typeorm_1.getManager()

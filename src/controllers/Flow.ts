@@ -24,7 +24,6 @@ import ActionModel from '../entity/Action';
 import NodeConnectionModel from '../entity/NodeConnection';
 import FlowModel from '../entity/Flow';
 import FlowInstanceModel from '../entity/FlowInstance';
-import ActionModel from '../entity/Action';
 
 
 
@@ -197,50 +196,60 @@ class Flow extends Controller {
   async duplicateFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
 
     const flowData = await manager.findOne(FlowModel, params.flowId);
-    const flowToClone = {
-      ...flowData,
-      flowId: undefined as any,
-      nodes: [] as any[],
-      createdAt: undefined as any
+
+    if (flowData){
+      const flowToClone = {
+        ...flowData,
+        flowId: undefined as any,
+        nodes: [] as any[],
+        createdAt: undefined as any
+      }
+
+      const flowDataClone:any = await manager.save(FlowModel, {...flowToClone, name: `${flowData.name} Copy`});
+
+
+
+
+      const nodesToDuplicate = await manager.find(NodeModel, { flowId: flowData?.flowId });
+      if (nodesToDuplicate){
+        const originalNodeIds = nodesToDuplicate.map((node) => node.nodeId);
+        const duplicatedNodes = nodesToDuplicate.map((node) => {
+          const duplicatedNode = manager.create(NodeModel, { ...node, nodeId:undefined as any });
+          duplicatedNode.flowId =flowDataClone.flowId;
+          return duplicatedNode;
+        }); const savedNodes = await manager.save(duplicatedNodes);
+
+
+        const newNodeIds = savedNodes.map((node) => node.nodeId);
+
+
+        const connectionsToDuplicate = await manager.find(NodeConnectionModel, {
+          where: { nodeIdChild: In(originalNodeIds) }
+        });
+
+
+        const duplicatedConnections = newNodeIds.map((nodeId, index) => {
+
+          const duplicatedConnection = manager.create(NodeConnectionModel, {
+            nodeConnectionId : undefined,
+            nodeIdMaster: index === 0 ? null : newNodeIds[index - 1],
+            nodeIdChild: nodeId,
+          });
+          return duplicatedConnection;
+        });
+
+        await manager.save(duplicatedConnections);
+
+      }
+      return {success:true}
+    }else{
+      return {success:false, "respuesta": "No Flow"}
     }
 
-    const flowDataClone:any = await manager.save(FlowModel, {...flowToClone, name: `${flowData.name} Copy`});
 
 
 
 
-    const nodesToDuplicate = await manager.find(NodeModel, { flowId: flowData?.flowId });
-    const originalNodeIds = nodesToDuplicate.map((node) => node.nodeId);
-    const duplicatedNodes = nodesToDuplicate.map((node) => {
-      const duplicatedNode = manager.create(NodeModel, { ...node, nodeId:undefined as any });
-      duplicatedNode.flowId =flowDataClone.flowId;
-      return duplicatedNode;
-    }); const savedNodes = await manager.save(duplicatedNodes);
-
-
-    const newNodeIds = savedNodes.map((node) => node.nodeId);
-
-
-    const connectionsToDuplicate = await manager.find(NodeConnectionModel, {
-      where: { nodeIdChild: In(originalNodeIds) }
-    });
-
-
-    const duplicatedConnections = newNodeIds.map((nodeId, index) => {
-
-      const duplicatedConnection = manager.create(NodeConnectionModel, {
-        nodeConnectionId : undefined,
-        nodeIdMaster: index === 0 ? null : newNodeIds[index - 1],
-        nodeIdChild: nodeId,
-      });
-      return duplicatedConnection;
-    });
-
-    await manager.save(duplicatedConnections);
-
-
-
- return {success:true}
   }
 
 
@@ -388,6 +397,7 @@ class Flow extends Controller {
     let flowId = null;
 
     let taskIds:any = [];
+
     if (nodeRefIds.length === 0) {
         flowId= params.board.columns['2-column-nodes-configured'].flowId;
     }else{
@@ -398,6 +408,7 @@ class Flow extends Controller {
           if (nodeId != 'new') {
             id = parseInt(nodeId.split("-")[1]);
             taskIds.push(id);
+
 
 
             const connectionsToDel = await manager.find(NodeConnectionModel, {
@@ -415,6 +426,7 @@ class Flow extends Controller {
 
             }
           }
+
         }
       }
     }
@@ -480,15 +492,18 @@ class Flow extends Controller {
 
 
 
-       //save in node and node_connection
-          const newConnection = manager.create(NodeConnectionModel, {
-            nodeConnectionId : undefined,
-            nodeIdMaster: masterId,
-            nodeIdChild: id,
-          });
-          masterId= id;
-         const savedNodes = await manager.save(newConnection);
-       // }
+
+        //save in node and node_connection
+        const newConnection = manager.create(NodeConnectionModel, {
+          nodeConnectionId : undefined,
+          nodeIdMaster: masterId,
+          nodeIdChild: id,
+        });
+        masterId= id;
+        const savedNodes = await manager.save(newConnection);
+        // }
+
+
 
 
 

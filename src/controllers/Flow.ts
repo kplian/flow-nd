@@ -210,7 +210,8 @@ class Flow extends Controller {
 
 
 
-      const nodesToDuplicate = await manager.find(NodeModel, { flowId: flowData?.flowId });
+      const nodesToDuplicate = await manager.find(NodeModel, { flowId: flowData?.flowId ,isActive:true});
+
       if (nodesToDuplicate){
         const originalNodeIds = nodesToDuplicate.map((node) => node.nodeId);
         const duplicatedNodes = nodesToDuplicate.map((node) => {

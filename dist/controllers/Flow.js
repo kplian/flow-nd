@@ -146,7 +146,8 @@ let Flow = class Flow extends core_1.Controller {
                 createdAt: undefined
             };
             const flowDataClone = await manager.save(Flow_1.default, { ...flowToClone, name: `${flowData.name} Copy` });
-            const nodesToDuplicate = await manager.find(Node_1.default, { flowId: flowData === null || flowData === void 0 ? void 0 : flowData.flowId });
+            const nodesToDuplicate = await manager.find(Node_1.default, { flowId: flowData === null || flowData === void 0 ? void 0 : flowData.flowId, isActive: true });
+            console.log('--->', nodesToDuplicate);
             if (nodesToDuplicate) {
                 const originalNodeIds = nodesToDuplicate.map((node) => node.nodeId);
                 const duplicatedNodes = nodesToDuplicate.map((node) => {

@@ -1,6 +1,10 @@
 {
   "name": "@pxp-nd/flow",
+<<<<<<< HEAD
   "version": "1.0.39",
+=======
+  "version": "1.0.42",
+>>>>>>> addbf0a88c9cf7bc3906aa2a6f66f636d6cf3311
   "description": "Workflow module for pxp-nd framework",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -32,8 +36,8 @@
     "@types/lodash": "^4.14.172",
     "@types/node": "^16.4.13",
     "rimraf": "^3.0.2",
-    "tsc-watch": "^4.2.9",
-    "typescript": "^4.2.4"
+    "tsc-watch": "^4.6.2",
+    "typescript": "^4.9.5"
   },
   "dependencies": {
     "@pxp-nd/common": "^1.1.4",

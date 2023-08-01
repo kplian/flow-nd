@@ -391,21 +391,22 @@ class Flow extends Controller {
         if (nodeId != 'new') {
           id = parseInt(nodeId.split("-")[1]);
           taskIds.push(id);
-        }
 
 
-        const connectionsToDel = await manager.find(NodeConnectionModel, {
-          where: {nodeIdChild: id}
-        });
-        if (connectionsToDel) {
-          //console.log("hay para eliminar---->", connectionsToDel);
-          const originalNodeCIds = connectionsToDel.map((node: any) => node.nodeConnectionId);
-          //console.log("eliminando: ", originalNodeCIds);
+          const connectionsToDel = await manager.find(NodeConnectionModel, {
+            where: {nodeIdChild: id}
+          });
 
-          let flowNodeC = await getManager().query(`DELETE
-                                                    from twf_node_connection
-                                                    WHERE node_connection_id = ${originalNodeCIds}`);
+          if (connectionsToDel) {
+            //console.log("hay para eliminar---->", connectionsToDel);
+            const originalNodeCIds = connectionsToDel.map((node: any) => node.nodeConnectionId);
+            //console.log("eliminando: ", originalNodeCIds);
 
+            let flowNodeC = await getManager().query(`DELETE
+                                                      from twf_node_connection
+                                                      WHERE node_connection_id = ${originalNodeCIds}`);
+
+          }
         }
       }
     }

@@ -280,7 +280,7 @@ class Flow extends Controller {
           "nc.nodeIdChild",
         ])
         .innerJoin("nc.childNode", "cn")
-        .where(`cn.flowId = :flowId`, { flowId: params.flowId as number })
+        .where(`cn.isActive = 1 and cn.flowId = :flowId`, { flowId: params.flowId as number })
         .getMany();
 
     const nodes = await getManager()
@@ -293,7 +293,7 @@ class Flow extends Controller {
           "a.description",
         ])
         .innerJoin("n.action", "a")
-        .where(`n.flowId = :flowId`, { flowId: params.flowId as number })
+        .where(`n.isActive = 1 and n.flowId = :flowId`, { flowId: params.flowId as number })
         .getMany();
 
     let sortedNodes = this.sortNodesByConnections(nodes, connections);

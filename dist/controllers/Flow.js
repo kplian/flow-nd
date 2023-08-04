@@ -57,7 +57,7 @@ let Flow = class Flow extends core_1.Controller {
         return restNodes;
     }
     async copyNodeConnections(nodeId, newNodeId, newFlowId, manager) {
-        const connections = await core_1.__(NodeConnection_1.default.find({ nodeIdMaster: nodeId }));
+        const connections = await (0, core_1.__)(NodeConnection_1.default.find({ nodeIdMaster: nodeId }));
         for (let connection of connections) {
             const newNodeConnection = new NodeConnection_1.default();
             const { nodeConnectionId, nodeIdMaster, nodeIdChild, createdAt, modifiedAt, ...nodeConnectionToCopy } = connection;
@@ -65,7 +65,7 @@ let Flow = class Flow extends core_1.Controller {
             const dataNodeChild = await Node_1.default.findOne({ nodeId: connection.nodeIdChild });
             const { nodeId: newNodeIdChild } = await this.copyNode(dataNodeChild, newFlowId, manager);
             Object.assign(newNodeConnection, { ...nodeConnectionToCopy, nodeIdMaster: newNodeId, nodeIdChild: newNodeIdChild });
-            const insertNewNodeConnection = await core_1.__(manager.save(NodeConnection_1.default, newNodeConnection));
+            const insertNewNodeConnection = await (0, core_1.__)(manager.save(NodeConnection_1.default, newNodeConnection));
         }
     }
     async copyNode(node, newFlowId, manager) {
@@ -73,20 +73,20 @@ let Flow = class Flow extends core_1.Controller {
         const newNode = new Node_1.default();
         const { nodeId, flowId, createdAt, modifiedAt, actionConfigJson, ...nodeToCopy } = node;
         Object.assign(newNode, { ...nodeToCopy, flowId: newFlowId });
-        const insertNewNode = await core_1.__(manager.save(Node_1.default, newNode));
+        const insertNewNode = await (0, core_1.__)(manager.save(Node_1.default, newNode));
         // insert connection
         await this.copyNodeConnections(node.nodeId, insertNewNode.nodeId, newFlowId, manager);
         return { nodeId: insertNewNode.nodeId };
     }
     async createFlowFromFlow(params, manager) {
         // we need clone the flow selected
-        const dataFlow = await core_1.__(Flow_1.default.findOne(params.flowId));
+        const dataFlow = await (0, core_1.__)(Flow_1.default.findOne(params.flowId));
         const { flowId, createdAt, modifiedAt, nodes, ...flowToCopy } = dataFlow;
         const newFlow = new Flow_1.default();
         Object.assign(newFlow, flowToCopy);
         newFlow.name = params.name;
         newFlow.description = params.description;
-        const insertNewFlow = await core_1.__(manager.save(Flow_1.default, newFlow));
+        const insertNewFlow = await (0, core_1.__)(manager.save(Flow_1.default, newFlow));
         // create the nodes
         // get the first node "the trigger node"
         const dataNode = await Node_1.default.findOne({ where: { flowId: params.flowId }, order: { nodeId: "ASC" } });
@@ -94,11 +94,11 @@ let Flow = class Flow extends core_1.Controller {
         return { flowId: insertNewFlow.flowId };
     }
     async deleteFlow(params, manager) {
-        let dataFlow = await core_1.__(Flow_1.default.findOne(params.flowId));
+        let dataFlow = await (0, core_1.__)(Flow_1.default.findOne(params.flowId));
         if (dataFlow) {
             dataFlow.isActive = 0;
             dataFlow.enabled = 'N';
-            const updFlow = await core_1.__(manager.save(dataFlow));
+            const updFlow = await (0, core_1.__)(manager.save(dataFlow));
             if (updFlow) {
                 let flowInstance = `UPDATE twf_flow_instance SET
             is_active = 'N' WHERE flow_id = ${updFlow.flowId}`;
@@ -109,7 +109,7 @@ let Flow = class Flow extends core_1.Controller {
                 const nodesToInact = await manager.find(Node_1.default, { flowId: updFlow.flowId });
                 const originalNodeIds = nodesToInact.map((node) => node.nodeId);
                 const connectionsToInact = await manager.find(NodeConnection_1.default, {
-                    where: { nodeIdChild: typeorm_1.In(originalNodeIds) } // Suponiendo que originalNodeIds contiene los IDs de los nodos originales que deseas duplicar
+                    where: { nodeIdChild: (0, typeorm_1.In)(originalNodeIds) } // Suponiendo que originalNodeIds contiene los IDs de los nodos originales que deseas duplicar
                 });
                 const originalNodeCIds = connectionsToInact.map((node) => node.nodeConnectionId);
                 let flowNodeC = `UPDATE twf_node_connection SET
@@ -126,10 +126,10 @@ let Flow = class Flow extends core_1.Controller {
         }
     }
     async saveFlowName(params, manager) {
-        let dataFlow = await core_1.__(Flow_1.default.findOne(params.flowId));
+        let dataFlow = await (0, core_1.__)(Flow_1.default.findOne(params.flowId));
         if (dataFlow) {
             dataFlow.name = params.name;
-            const updFlow = await core_1.__(manager.save(dataFlow));
+            const updFlow = await (0, core_1.__)(manager.save(dataFlow));
             return { success: true };
         }
         else {
@@ -146,7 +146,7 @@ let Flow = class Flow extends core_1.Controller {
                 createdAt: undefined
             };
             const flowDataClone = await manager.save(Flow_1.default, { ...flowToClone, name: `${flowData.name} Copy` });
-            const nodesToDuplicate = await manager.find(Node_1.default, { flowId: flowData === null || flowData === void 0 ? void 0 : flowData.flowId });
+            const nodesToDuplicate = await manager.find(Node_1.default, { flowId: flowData === null || flowData === void 0 ? void 0 : flowData.flowId, isActive: true });
             if (nodesToDuplicate) {
                 const originalNodeIds = nodesToDuplicate.map((node) => node.nodeId);
                 const duplicatedNodes = nodesToDuplicate.map((node) => {
@@ -157,7 +157,7 @@ let Flow = class Flow extends core_1.Controller {
                 const savedNodes = await manager.save(duplicatedNodes);
                 const newNodeIds = savedNodes.map((node) => node.nodeId);
                 const connectionsToDuplicate = await manager.find(NodeConnection_1.default, {
-                    where: { nodeIdChild: typeorm_1.In(originalNodeIds) }
+                    where: { nodeIdChild: (0, typeorm_1.In)(originalNodeIds) }
                 });
                 const duplicatedConnections = newNodeIds.map((nodeId, index) => {
                     const duplicatedConnection = manager.create(NodeConnection_1.default, {
@@ -176,7 +176,7 @@ let Flow = class Flow extends core_1.Controller {
         }
     }
     async getFlowRender(params) {
-        let actions = await typeorm_1.getManager()
+        let actions = await (0, typeorm_1.getManager)()
             .createQueryBuilder(Action_1.default, "a")
             .select([
             "a.actionId",
@@ -188,16 +188,16 @@ let Flow = class Flow extends core_1.Controller {
             .innerJoin("a.actionType", "at")
             .where(`a.isActive = 1 and a.hidden = 'N'`)
             .getMany();
-        const connections = await typeorm_1.getManager()
+        const connections = await (0, typeorm_1.getManager)()
             .createQueryBuilder(NodeConnection_1.default, "nc")
             .select([
             "nc.nodeIdMaster",
             "nc.nodeIdChild",
         ])
             .innerJoin("nc.childNode", "cn")
-            .where(`cn.flowId = :flowId`, { flowId: params.flowId })
+            .where(`cn.isActive = 1 and cn.flowId = :flowId`, { flowId: params.flowId })
             .getMany();
-        const nodes = await typeorm_1.getManager()
+        const nodes = await (0, typeorm_1.getManager)()
             .createQueryBuilder(Node_1.default, "n")
             .select([
             "n.nodeId",
@@ -207,7 +207,7 @@ let Flow = class Flow extends core_1.Controller {
             "a.description",
         ])
             .innerJoin("n.action", "a")
-            .where(`n.flowId = :flowId`, { flowId: params.flowId })
+            .where(`n.isActive = 1 and n.flowId = :flowId`, { flowId: params.flowId })
             .getMany();
         let sortedNodes = this.sortNodesByConnections(nodes, connections);
         actions.forEach((item) => {
@@ -302,7 +302,7 @@ let Flow = class Flow extends core_1.Controller {
                             //console.log("hay para eliminar---->", connectionsToDel);
                             const originalNodeCIds = connectionsToDel.map((node) => node.nodeConnectionId);
                             //console.log("eliminando: ", originalNodeCIds);
-                            let flowNodeC = await typeorm_1.getManager().query(`DELETE
+                            let flowNodeC = await (0, typeorm_1.getManager)().query(`DELETE
                                                       from twf_node_connection
                                                       WHERE node_connection_id = ${originalNodeCIds}`);
                         }
@@ -311,7 +311,7 @@ let Flow = class Flow extends core_1.Controller {
             }
         }
         //If there are some nodes in node_connections after delete all records sent, to inactive node
-        let connectNoDel = await typeorm_1.getManager().query(`SELECT n.node_id
+        let connectNoDel = await (0, typeorm_1.getManager)().query(`SELECT n.node_id
                                                     from twf_node_connection nd 
                                                     inner join twf_node n on n.node_id = nd.node_id_child
                                                     WHERE n.flow_id= ${flowId}`);
@@ -363,69 +363,69 @@ let Flow = class Flow extends core_1.Controller {
     }
 };
 __decorate([
-    core_1.Get(),
-    core_1.DbSettings('Orm'),
-    core_1.ReadOnly(true),
-    core_1.Log(true),
+    (0, core_1.Get)(),
+    (0, core_1.DbSettings)('Orm'),
+    (0, core_1.ReadOnly)(true),
+    (0, core_1.Log)(true),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], Flow.prototype, "get", null);
 __decorate([
-    core_1.Post(),
-    core_1.DbSettings('Orm'),
-    core_1.ReadOnly(false),
-    core_1.Log(true),
+    (0, core_1.Post)(),
+    (0, core_1.DbSettings)('Orm'),
+    (0, core_1.ReadOnly)(false),
+    (0, core_1.Log)(true),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
 ], Flow.prototype, "createFlowFromFlow", null);
 __decorate([
-    core_1.Post(),
-    core_1.DbSettings('Orm'),
-    core_1.ReadOnly(false),
-    core_1.Log(true),
+    (0, core_1.Post)(),
+    (0, core_1.DbSettings)('Orm'),
+    (0, core_1.ReadOnly)(false),
+    (0, core_1.Log)(true),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
 ], Flow.prototype, "deleteFlow", null);
 __decorate([
-    core_1.Post(),
-    core_1.DbSettings('Orm'),
-    core_1.ReadOnly(false),
-    core_1.Log(true),
+    (0, core_1.Post)(),
+    (0, core_1.DbSettings)('Orm'),
+    (0, core_1.ReadOnly)(false),
+    (0, core_1.Log)(true),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
 ], Flow.prototype, "saveFlowName", null);
 __decorate([
-    core_1.Post(),
-    core_1.DbSettings('Orm'),
-    core_1.ReadOnly(false),
-    core_1.Log(true),
+    (0, core_1.Post)(),
+    (0, core_1.DbSettings)('Orm'),
+    (0, core_1.ReadOnly)(false),
+    (0, core_1.Log)(true),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
 ], Flow.prototype, "duplicateFlow", null);
 __decorate([
-    core_1.Get(),
-    core_1.DbSettings('Orm'),
-    core_1.ReadOnly(true),
-    core_1.Log(true),
+    (0, core_1.Get)(),
+    (0, core_1.DbSettings)('Orm'),
+    (0, core_1.ReadOnly)(true),
+    (0, core_1.Log)(true),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], Flow.prototype, "getFlowRender", null);
 __decorate([
-    core_1.Post(),
-    core_1.DbSettings('Orm'),
-    core_1.ReadOnly(false),
-    core_1.Log(true),
+    (0, core_1.Post)(),
+    (0, core_1.DbSettings)('Orm'),
+    (0, core_1.ReadOnly)(false),
+    (0, core_1.Log)(true),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
 ], Flow.prototype, "saveFlow", null);
 Flow = __decorate([
-    core_1.Model('flow-nd/Flow')
+    (0, core_1.Model)('flow-nd/Flow')
 ], Flow);
 exports.default = Flow;

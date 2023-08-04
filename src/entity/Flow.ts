@@ -38,7 +38,7 @@ export default class Flow extends PxpEntity{
 	@OneToMany( () => FlowInstance, flowInstance => flowInstance.flow)
 	instances: FlowInstance[];
 
-	@OneToMany( () => Node, node => node.flow, {eager: true})
+	@OneToMany( () => Node, node => node.flow)
 	nodes: Node[];
 
 

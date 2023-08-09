@@ -270,26 +270,50 @@ class Flow extends Controller {
   @ReadOnly(false)
   @Log(true)
   async saveFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
-console.log (params);
+
     let nodeRefIds = params.board.columns['2-column-nodes-configured'].taskIds;
-    console.log ("nodesRef:",nodeRefIds);
+
      let nodes = params.board.tasks?params.board.tasks:[];
-     console.log ("nod:", nodes);
+
 
      let masterId = null;
      let id = null;
+     let newId = null;
      let flowId = null;
 
 
      let taskIds:any = [];
      if (nodeRefIds.length === 0) {
-       flowId= params.board.columns['2-column-nodes-configured'].flowId;
+
+       let nodeDelIdd = parseInt(params.board.deleteId.split("-")[1]);
+       const lastNoded = await NodeModel.findOne({
+         where: {
+           nodeId: nodeDelIdd
+         }
+       });
+       flowId= lastNoded.flowId;
      }else{
+       flowId = params.board.flowId;
        for (const nodeId of nodeRefIds) {
-         // console.log ('node:',nodes[`${nodeId}`]);
+
            if (nodeId != 'new') {
-             id = parseInt(nodeId.split("-")[1]);
+             id = parseInt(nodeId.split("node-")[1]);
+
+             if (!id){
+               const lastNode = await NodeModel.findOne({
+                 where: {
+                   flowId: flowId,
+                 },
+                 order: {
+                   nodeId: 'DESC', // Ordena por ID en orden descendente para obtener el último registro
+                 },
+               });
+
+               id = lastNode.nodeId;
+             }
+
              taskIds.push(id);
+
 
              const connectionsToDel = await manager.find(NodeConnectionModel, {
                where: {nodeIdChild: id}
@@ -297,26 +321,27 @@ console.log (params);
 
 
              if (connectionsToDel) {
-               //console.log("hay para eliminar---->", connectionsToDel);
+
                const originalNodeCIds = connectionsToDel.map((node: any) => node.nodeConnectionId);
-               //console.log("eliminando: ", originalNodeCIds);
+
 
                let flowNodeC = await getManager().query(`DELETE
                                                        from twf_node_connection
                                                        WHERE node_connection_id = ${originalNodeCIds}`);
 
              }
+           }else{
+             taskIds.push('new');
            }
 
          //}
        }
      }
- //if (nodes[`${nodeId}`]) {
-           //flowId = nodes[`${nodeId}`].flowId;
-     if (params.board.origin =='deleteTask') { console.log("aqui elimina", params.board.deleteID);
+
+     if (params.board.origin =='deleteTask') {
         let nodeDelId = parseInt(params.board.deleteId.split("-")[1]);
 
-        console.log (nodeDelId);
+
 
         if (nodeDelId){
           //If there are some nodes in node_connections after delete all records sent, to inactive node
@@ -345,13 +370,12 @@ console.log (params);
 
 
      }
-console.log ("aqui tiene q entrar a volver a insertar");
-     //armamos las relaciones
+
      if (nodeRefIds.length === 0) {
 
      }else{
-       for (const nodeId of nodeRefIds) {
-        // if (nodes[`${nodeId}`]) {
+       for (const nodeId of taskIds) {
+
            if(nodeId==='new' ){
              //get information about Action
              const newAction = await ActionModel.findOne({ code: nodes[`${nodeId}`].action.code });
@@ -364,8 +388,9 @@ console.log ("aqui tiene q entrar a volver a insertar");
              });
              const saveNode = await manager.save(newNode);
              id = saveNode.nodeId;
+             newId = saveNode.nodeId;
            }else{
-             id = parseInt(nodeId.split("-")[1]);
+             id = nodeId;
            }
 
 
@@ -386,8 +411,8 @@ console.log ("aqui tiene q entrar a volver a insertar");
      }
 
 
-   console.log ("fin de funcion");
-    return {success:true}
+
+    return {success:true, nodeId: newId}
   }
 
 

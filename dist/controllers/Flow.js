@@ -11,6 +11,7 @@
  * * -------------- ----------- -------------- ------------------------------------
  * 08-Jul-2021                  Jaime Rivera           Created
  * 18-Jul-2023    SP28JUL23     Mercedes Zambrana      Add deleteFlow, saveFlowName, duplicateFlow
+ * 02-Aug-2023    SP11AUG23     Mercedes Zambrana      Add validations in deleteFlow and saveFlow
  * ******************************************************************************
  */
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
@@ -103,18 +104,23 @@ let Flow = class Flow extends core_1.Controller {
                 let flowInstance = `UPDATE twf_flow_instance SET
             is_active = 'N' WHERE flow_id = ${updFlow.flowId}`;
                 await manager.query(flowInstance);
-                let flowNode = `UPDATE twf_node SET
+                const nodesToInact = await manager.find(Node_1.default, { flowId: updFlow.flowId, isActive: true });
+                if (nodesToInact.length > 0) {
+                    let flowNode = `UPDATE twf_node SET
             is_active = 'N' WHERE flow_id = ${updFlow.flowId}`;
-                await manager.query(flowNode);
-                const nodesToInact = await manager.find(Node_1.default, { flowId: updFlow.flowId });
-                const originalNodeIds = nodesToInact.map((node) => node.nodeId);
-                const connectionsToInact = await manager.find(NodeConnection_1.default, {
-                    where: { nodeIdChild: (0, typeorm_1.In)(originalNodeIds) } // Suponiendo que originalNodeIds contiene los IDs de los nodos originales que deseas duplicar
-                });
-                const originalNodeCIds = connectionsToInact.map((node) => node.nodeConnectionId);
-                let flowNodeC = `UPDATE twf_node_connection SET
+                    await manager.query(flowNode);
+                    const nodesToInact = await manager.find(Node_1.default, { flowId: updFlow.flowId });
+                    const originalNodeIds = nodesToInact.map((node) => node.nodeId);
+                    const connectionsToInact = await manager.find(NodeConnection_1.default, {
+                        where: { nodeIdChild: (0, typeorm_1.In)(originalNodeIds) } // Suponiendo que originalNodeIds contiene los IDs de los nodos originales que deseas duplicar
+                    });
+                    const originalNodeCIds = connectionsToInact.map((node) => node.nodeConnectionId);
+                    if (originalNodeCIds.length > 0) {
+                        let flowNodeC = `UPDATE twf_node_connection SET
             is_active = 'N' WHERE node_connection_id in ( ${originalNodeCIds})`;
-                await manager.query(flowNodeC);
+                        await manager.query(flowNodeC);
+                    }
+                }
                 return { success: true };
             }
             else {
@@ -175,6 +181,113 @@ let Flow = class Flow extends core_1.Controller {
             return { success: false, "respuesta": "No Flow" };
         }
     }
+    async saveFlow(params, manager) {
+        let nodeRefIds = params.board.columns['2-column-nodes-configured'].taskIds;
+        let nodes = params.board.tasks ? params.board.tasks : [];
+        let masterId = null;
+        let id = null;
+        let newId = null;
+        let flowId = null;
+        let taskIds = [];
+        if (nodeRefIds.length === 0) {
+            let nodeDelIdd = parseInt(params.board.deleteId.split("-")[1]);
+            const lastNoded = await Node_1.default.findOne({
+                where: {
+                    nodeId: nodeDelIdd
+                }
+            });
+            flowId = lastNoded.flowId;
+        }
+        else {
+            flowId = params.board.flowId;
+            for (const nodeId of nodeRefIds) {
+                if (nodeId != 'new') {
+                    id = parseInt(nodeId.split("node-")[1]);
+                    if (!id) {
+                        const lastNode = await Node_1.default.findOne({
+                            where: {
+                                flowId: flowId,
+                            },
+                            order: {
+                                nodeId: 'DESC', // Ordena por ID en orden descendente para obtener el último registro
+                            },
+                        });
+                        id = lastNode.nodeId;
+                    }
+                    taskIds.push(id);
+                    const connectionsToDel = await manager.find(NodeConnection_1.default, {
+                        where: { nodeIdChild: id }
+                    });
+                    if (connectionsToDel) {
+                        const originalNodeCIds = connectionsToDel.map((node) => node.nodeConnectionId);
+                        let flowNodeC = await (0, typeorm_1.getManager)().query(`DELETE
+                                                       from twf_node_connection
+                                                       WHERE node_connection_id = ${originalNodeCIds}`);
+                    }
+                }
+                else {
+                    taskIds.push('new');
+                }
+                //}
+            }
+        }
+        if (params.board.origin == 'deleteTask') {
+            let nodeDelId = parseInt(params.board.deleteId.split("-")[1]);
+            if (nodeDelId) {
+                //If there are some nodes in node_connections after delete all records sent, to inactive node
+                let connectNoDel = await (0, typeorm_1.getManager)().query(`SELECT n.node_id
+                                                    from twf_node_connection nd
+                                                           inner join twf_node n on n.node_id = nd.node_id_child
+                                                    WHERE n.node_id = ${nodeDelId}`);
+                const currentNodesIds = connectNoDel.map((record) => record.node_id);
+                // Get nodes to remove
+                const nodesToRemove = currentNodesIds.filter((nodeId) => !taskIds.includes(nodeId.toString()));
+                // Inactive nodes
+                if (nodesToRemove.length > 0) {
+                    const delNodeConnect = await manager.delete(NodeConnection_1.default, { nodeIdChild: nodesToRemove[0] });
+                    if (delNodeConnect) {
+                        let dNode = `UPDATE twf_node
+                        SET is_active = 'N'
+                        WHERE node_id = ${nodesToRemove[0]}`;
+                        await manager.query(dNode);
+                    }
+                }
+            }
+        }
+        if (nodeRefIds.length === 0) {
+        }
+        else {
+            for (const nodeId of taskIds) {
+                if (nodeId === 'new') {
+                    //get information about Action
+                    const newAction = await Action_1.default.findOne({ code: nodes[`${nodeId}`].action.code });
+                    const newNode = manager.create(Node_1.default, {
+                        nodeId: undefined,
+                        flowId: nodes[`${nodeId}`].flowId,
+                        isInit: 'N',
+                        actionId: newAction.actionId
+                    });
+                    const saveNode = await manager.save(newNode);
+                    id = saveNode.nodeId;
+                    newId = saveNode.nodeId;
+                }
+                else {
+                    id = nodeId;
+                }
+                //save in node and node_connection
+                const newConnection = manager.create(NodeConnection_1.default, {
+                    nodeConnectionId: undefined,
+                    nodeIdMaster: masterId,
+                    nodeIdChild: id,
+                });
+                masterId = id;
+                const savedNodes = await manager.save(newConnection);
+                // }
+            }
+            //}
+        }
+        return { success: true, nodeId: newId };
+    }
     async getFlowRender(params) {
         let actions = await (0, typeorm_1.getManager)()
             .createQueryBuilder(Action_1.default, "a")
@@ -214,6 +327,7 @@ let Flow = class Flow extends core_1.Controller {
             item.actionId = `action-${item.actionId}`;
         });
         sortedNodes.forEach((item) => {
+            item.node = { nodeId: item.nodeId };
             item.nodeId = `node-${item.nodeId}`;
         });
         const actionIds = actions.map((item) => item.actionId);
@@ -277,90 +391,6 @@ let Flow = class Flow extends core_1.Controller {
         });
         return sortedNodes;
     }
-    async saveFlow(params, manager) {
-        let nodeRefIds = params.board.columns['2-column-nodes-configured'].taskIds;
-        let nodes = params.board.tasks;
-        let masterId = null;
-        let id = null;
-        let flowId = null;
-        let taskIds = [];
-        if (nodeRefIds.length === 0) {
-            flowId = params.board.columns['2-column-nodes-configured'].flowId;
-        }
-        else {
-            for (const nodeId of nodeRefIds) {
-                // console.log ('node:',nodes[`${nodeId}`]);
-                if (nodes[`${nodeId}`]) {
-                    flowId = nodes[`${nodeId}`].flowId;
-                    if (nodeId != 'new') {
-                        id = parseInt(nodeId.split("-")[1]);
-                        taskIds.push(id);
-                        const connectionsToDel = await manager.find(NodeConnection_1.default, {
-                            where: { nodeIdChild: id }
-                        });
-                        if (connectionsToDel) {
-                            //console.log("hay para eliminar---->", connectionsToDel);
-                            const originalNodeCIds = connectionsToDel.map((node) => node.nodeConnectionId);
-                            //console.log("eliminando: ", originalNodeCIds);
-                            let flowNodeC = await (0, typeorm_1.getManager)().query(`DELETE
-                                                      from twf_node_connection
-                                                      WHERE node_connection_id = ${originalNodeCIds}`);
-                        }
-                    }
-                }
-            }
-        }
-        //If there are some nodes in node_connections after delete all records sent, to inactive node
-        let connectNoDel = await (0, typeorm_1.getManager)().query(`SELECT n.node_id
-                                                    from twf_node_connection nd 
-                                                    inner join twf_node n on n.node_id = nd.node_id_child
-                                                    WHERE n.flow_id= ${flowId}`);
-        const currentNodesIds = connectNoDel.map((record) => record.node_id);
-        // Get nodes to remove
-        const nodesToRemove = currentNodesIds.filter((nodeId) => !taskIds.includes(nodeId.toString()));
-        // Inactive nodes
-        if (nodesToRemove.length > 0) {
-            const delNodeConnect = await manager.delete(NodeConnection_1.default, { nodeIdChild: nodesToRemove[0] });
-            if (delNodeConnect) {
-                let dNode = `UPDATE twf_node SET
-            is_active = 'N' WHERE node_id = ${nodesToRemove[0]}`;
-                await manager.query(dNode);
-            }
-        }
-        if (nodeRefIds.length === 0) {
-        }
-        else {
-            for (const nodeId of nodeRefIds) {
-                if (nodes[`${nodeId}`]) {
-                    if (nodeId === 'new') {
-                        //get information about Action
-                        const newAction = await Action_1.default.findOne({ code: nodes[`${nodeId}`].action.code });
-                        const newNode = manager.create(Node_1.default, {
-                            nodeId: undefined,
-                            flowId: nodes[`${nodeId}`].flowId,
-                            isInit: 'N',
-                            actionId: newAction.actionId
-                        });
-                        const saveNode = await manager.save(newNode);
-                        id = saveNode.nodeId;
-                    }
-                    else {
-                        id = parseInt(nodeId.split("-")[1]);
-                    }
-                    //save in node and node_connection
-                    const newConnection = manager.create(NodeConnection_1.default, {
-                        nodeConnectionId: undefined,
-                        nodeIdMaster: masterId,
-                        nodeIdChild: id,
-                    });
-                    masterId = id;
-                    const savedNodes = await manager.save(newConnection);
-                    // }
-                }
-            }
-        }
-        return { success: true };
-    }
 };
 __decorate([
     (0, core_1.Get)(),
@@ -408,15 +438,6 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], Flow.prototype, "duplicateFlow", null);
 __decorate([
-    (0, core_1.Get)(),
-    (0, core_1.DbSettings)('Orm'),
-    (0, core_1.ReadOnly)(true),
-    (0, core_1.Log)(true),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", Promise)
-], Flow.prototype, "getFlowRender", null);
-__decorate([
     (0, core_1.Post)(),
     (0, core_1.DbSettings)('Orm'),
     (0, core_1.ReadOnly)(false),
@@ -425,6 +446,15 @@ __decorate([
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
 ], Flow.prototype, "saveFlow", null);
+__decorate([
+    (0, core_1.Get)(),
+    (0, core_1.DbSettings)('Orm'),
+    (0, core_1.ReadOnly)(true),
+    (0, core_1.Log)(true),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], Flow.prototype, "getFlowRender", null);
 Flow = __decorate([
     (0, core_1.Model)('flow-nd/Flow')
 ], Flow);

@@ -303,11 +303,13 @@ class Flow extends Controller {
     });
 
     sortedNodes.forEach((item:any) => {
+      item.node = {nodeId: item.nodeId}
       item.nodeId = `node-${item.nodeId}`;
     });
 
     const actionIds = actions.map((item:any) =>item.actionId);
     const nodeIds = sortedNodes.map((item:any) =>item.nodeId);
+
 
     sortedNodes = sortedNodes.map(({ nodeId, ...rest }) => {
       return { id: nodeId, ...rest };

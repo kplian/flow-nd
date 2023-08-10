@@ -10,6 +10,7 @@
  * * -------------- ----------- -------------- ------------------------------------
  * 08-Jul-2021                  Jaime Rivera           Created
  * 18-Jul-2023    SP28JUL23     Mercedes Zambrana      Add deleteFlow, saveFlowName, duplicateFlow
+ * 02-Aug-2023    SP11AUG23     Mercedes Zambrana      Add validations in deleteFlow and saveFlow
  * ******************************************************************************
  */
 
@@ -136,6 +137,9 @@ class Flow extends Controller {
             is_active = 'N' WHERE flow_id = ${updFlow.flowId}`;
         await manager.query(flowInstance);
 
+        const nodesToInact = await manager.find(NodeModel, { flowId: updFlow.flowId , isActive:true});
+
+        if (nodesToInact.length > 0){
 
         let flowNode = `UPDATE twf_node SET
             is_active = 'N' WHERE flow_id = ${updFlow.flowId}`;
@@ -151,10 +155,13 @@ class Flow extends Controller {
 
         const originalNodeCIds = connectionsToInact.map((node) => node.nodeConnectionId);
 
-
+          if (originalNodeCIds.length > 0){
         let flowNodeC = `UPDATE twf_node_connection SET
             is_active = 'N' WHERE node_connection_id in ( ${originalNodeCIds})`;
         await manager.query(flowNodeC);
+          }
+
+        }
 
         return { success : true };
       }else{
@@ -254,6 +261,161 @@ class Flow extends Controller {
   }
 
 
+
+
+
+
+  @Post()
+  @DbSettings('Orm')
+  @ReadOnly(false)
+  @Log(true)
+  async saveFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+
+    let nodeRefIds = params.board.columns['2-column-nodes-configured'].taskIds;
+
+     let nodes = params.board.tasks?params.board.tasks:[];
+
+
+     let masterId = null;
+     let id = null;
+     let newId = null;
+     let flowId = null;
+
+
+     let taskIds:any = [];
+     if (nodeRefIds.length === 0) {
+
+       let nodeDelIdd = parseInt(params.board.deleteId.split("-")[1]);
+       const lastNoded = await NodeModel.findOne({
+         where: {
+           nodeId: nodeDelIdd
+         }
+       });
+       flowId= lastNoded.flowId;
+     }else{
+       flowId = params.board.flowId;
+       for (const nodeId of nodeRefIds) {
+
+           if (nodeId != 'new') {
+             id = parseInt(nodeId.split("node-")[1]);
+
+             if (!id){
+               const lastNode = await NodeModel.findOne({
+                 where: {
+                   flowId: flowId,
+                 },
+                 order: {
+                   nodeId: 'DESC', // Ordena por ID en orden descendente para obtener el último registro
+                 },
+               });
+
+               id = lastNode.nodeId;
+             }
+
+             taskIds.push(id);
+
+
+             const connectionsToDel = await manager.find(NodeConnectionModel, {
+               where: {nodeIdChild: id}
+             });
+
+
+             if (connectionsToDel) {
+
+               const originalNodeCIds = connectionsToDel.map((node: any) => node.nodeConnectionId);
+
+
+               let flowNodeC = await getManager().query(`DELETE
+                                                       from twf_node_connection
+                                                       WHERE node_connection_id = ${originalNodeCIds}`);
+
+             }
+           }else{
+             taskIds.push('new');
+           }
+
+         //}
+       }
+     }
+
+     if (params.board.origin =='deleteTask') {
+        let nodeDelId = parseInt(params.board.deleteId.split("-")[1]);
+
+
+
+        if (nodeDelId){
+          //If there are some nodes in node_connections after delete all records sent, to inactive node
+          let connectNoDel = await getManager().query(`SELECT n.node_id
+                                                    from twf_node_connection nd
+                                                           inner join twf_node n on n.node_id = nd.node_id_child
+                                                    WHERE n.node_id = ${nodeDelId}`);
+
+          const currentNodesIds = connectNoDel.map((record: { node_id: number }) => record.node_id);
+
+          // Get nodes to remove
+          const nodesToRemove = currentNodesIds.filter((nodeId: number) => !taskIds.includes(nodeId.toString()));
+
+          // Inactive nodes
+          if (nodesToRemove.length > 0) {
+            const delNodeConnect = await manager.delete(NodeConnectionModel, {nodeIdChild: nodesToRemove[0]});
+            if (delNodeConnect) {
+              let dNode = `UPDATE twf_node
+                        SET is_active = 'N'
+                        WHERE node_id = ${nodesToRemove[0]}`;
+              await manager.query(dNode);
+            }
+
+          }
+        }
+
+
+     }
+
+     if (nodeRefIds.length === 0) {
+
+     }else{
+       for (const nodeId of taskIds) {
+
+           if(nodeId==='new' ){
+             //get information about Action
+             const newAction = await ActionModel.findOne({ code: nodes[`${nodeId}`].action.code });
+
+             const newNode = manager.create(NodeModel, {
+               nodeId : undefined,
+               flowId: nodes[`${nodeId}`].flowId,
+               isInit: 'N',
+               actionId: newAction.actionId
+             });
+             const saveNode = await manager.save(newNode);
+             id = saveNode.nodeId;
+             newId = saveNode.nodeId;
+           }else{
+             id = nodeId;
+           }
+
+
+           //save in node and node_connection
+           const newConnection = manager.create(NodeConnectionModel, {
+             nodeConnectionId : undefined,
+             nodeIdMaster: masterId,
+             nodeIdChild: id,
+           });
+
+           masterId= id;
+           const savedNodes = await manager.save(newConnection);
+           // }
+
+         }
+
+       //}
+     }
+
+
+
+    return {success:true, nodeId: newId}
+  }
+
+
   @Get()
   @DbSettings('Orm')
   @ReadOnly(true)
@@ -280,7 +442,7 @@ class Flow extends Controller {
           "nc.nodeIdChild",
         ])
         .innerJoin("nc.childNode", "cn")
-        .where(`cn.flowId = :flowId`, { flowId: params.flowId as number })
+        .where(`cn.isActive = 1 and cn.flowId = :flowId`, { flowId: params.flowId as number })
         .getMany();
 
     const nodes = await getManager()
@@ -293,7 +455,7 @@ class Flow extends Controller {
           "a.description",
         ])
         .innerJoin("n.action", "a")
-        .where(`n.flowId = :flowId`, { flowId: params.flowId as number })
+        .where(`n.isActive = 1 and n.flowId = :flowId`, { flowId: params.flowId as number })
         .getMany();
 
     let sortedNodes = this.sortNodesByConnections(nodes, connections);
@@ -385,122 +547,6 @@ class Flow extends Controller {
     return sortedNodes;
   }
 
-
-
-  @Post()
-  @DbSettings('Orm')
-  @ReadOnly(false)
-  @Log(true)
-  async saveFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
-
-    let nodeRefIds = params.board.columns['2-column-nodes-configured'].taskIds;
-    let nodes = params.board.tasks;
-    let masterId = null;
-    let id = null;
-    let flowId = null;
-
-    let taskIds:any = [];
-    if (nodeRefIds.length === 0) {
-        flowId= params.board.columns['2-column-nodes-configured'].flowId;
-    }else{
-      for (const nodeId of nodeRefIds) {
-        // console.log ('node:',nodes[`${nodeId}`]);
-        if (nodes[`${nodeId}`]) {
-          flowId = nodes[`${nodeId}`].flowId;
-          if (nodeId != 'new') {
-            id = parseInt(nodeId.split("-")[1]);
-            taskIds.push(id);
-
-
-
-
-          const connectionsToDel = await manager.find(NodeConnectionModel, {
-            where: {nodeIdChild: id}
-          });
-
-
-            if (connectionsToDel) {
-              //console.log("hay para eliminar---->", connectionsToDel);
-              const originalNodeCIds = connectionsToDel.map((node: any) => node.nodeConnectionId);
-              //console.log("eliminando: ", originalNodeCIds);
-
-              let flowNodeC = await getManager().query(`DELETE
-                                                      from twf_node_connection
-                                                      WHERE node_connection_id = ${originalNodeCIds}`);
-
-            }
-          }
-
-        }
-      }
-    }
-
-
-    //If there are some nodes in node_connections after delete all records sent, to inactive node
-    let connectNoDel = await getManager().query(`SELECT n.node_id
-                                                    from twf_node_connection nd 
-                                                    inner join twf_node n on n.node_id = nd.node_id_child
-                                                    WHERE n.flow_id= ${flowId}`);
-
-    const currentNodesIds = connectNoDel.map((record: { node_id: number }) => record.node_id);
-
-    // Get nodes to remove
-    const nodesToRemove = currentNodesIds.filter((nodeId: number) => !taskIds.includes(nodeId.toString()));
-
-    // Inactive nodes
-    if (nodesToRemove.length > 0) {
-      const delNodeConnect = await manager.delete(NodeConnectionModel,{ nodeIdChild: nodesToRemove[0]});
-      if (delNodeConnect) {
-        let dNode = `UPDATE twf_node SET
-            is_active = 'N' WHERE node_id = ${nodesToRemove[0]}`;
-        await manager.query(dNode);
-      }
-
-    }
-
-
-    if (nodeRefIds.length === 0) {
-
-    }else{
-      for (const nodeId of nodeRefIds) {
-        if (nodes[`${nodeId}`]) {
-          if(nodeId==='new' ){
-            //get information about Action
-            const newAction = await ActionModel.findOne({ code: nodes[`${nodeId}`].action.code });
-
-            const newNode = manager.create(NodeModel, {
-              nodeId : undefined,
-              flowId: nodes[`${nodeId}`].flowId,
-              isInit: 'N',
-              actionId: newAction.actionId
-            });
-            const saveNode = await manager.save(newNode);
-            id = saveNode.nodeId;
-          }else{
-            id = parseInt(nodeId.split("-")[1]);
-          }
-
-
-          //save in node and node_connection
-          const newConnection = manager.create(NodeConnectionModel, {
-            nodeConnectionId : undefined,
-            nodeIdMaster: masterId,
-            nodeIdChild: id,
-          });
-
-          masterId= id;
-          const savedNodes = await manager.save(newConnection);
-          // }
-
-        }
-
-      }
-    }
-
-
-
-    return {success:true}
-  }
 
 }
 

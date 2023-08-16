@@ -11,6 +11,7 @@
  * 08-Jul-2021                  Jaime Rivera           Created
  * 18-Jul-2023    SP28JUL23     Mercedes Zambrana      Add deleteFlow, saveFlowName, duplicateFlow
  * 02-Aug-2023    SP11AUG23     Mercedes Zambrana      Add validations in deleteFlow and saveFlow
+ * 15-Aug-2023    SP25AUG23     Rensi Arteaga          Add logic to duplicate flows templates
  * ******************************************************************************
  */
 
@@ -204,7 +205,7 @@ class Flow extends Controller {
 
     const flowData = await manager.findOne(FlowModel, params.flowId);
 
-    if (flowData){
+    if (flowData) {
       const flowToClone = {
         ...flowData,
         flowId: undefined as any,
@@ -212,14 +213,19 @@ class Flow extends Controller {
         createdAt: undefined as any
       }
 
-      const flowDataClone:any = await manager.save(FlowModel, {...flowToClone, name: `${flowData.name} Copy`});
+      let flowDataClone:any
 
-
+       //if we have a vendoId as parameter the origin is a template
+      if(params.vendorId) {
+         flowDataClone = await manager.save(FlowModel, {...flowToClone, name: `${params.name}`, vendorId: params.vendorId, type: 'custom'});
+      } else {
+         flowDataClone = await manager.save(FlowModel, {...flowToClone, name: `${flowData.name} Copy`});
+      }
 
 
       const nodesToDuplicate = await manager.find(NodeModel, { flowId: flowData?.flowId ,isActive:true});
 
-      if (nodesToDuplicate){
+      if (nodesToDuplicate) {
         const originalNodeIds = nodesToDuplicate.map((node) => node.nodeId);
         const duplicatedNodes = nodesToDuplicate.map((node) => {
           const duplicatedNode = manager.create(NodeModel, { ...node, nodeId:undefined as any });
@@ -249,14 +255,10 @@ class Flow extends Controller {
         await manager.save(duplicatedConnections);
 
       }
-      return {success:true}
+      return { success:true, flowId: flowDataClone.flowId }
     }else{
-      return {success:false, "respuesta": "No Flow"}
+      return { success:false, "respuesta": "No Flow" }
     }
-
-
-
-
 
   }
 

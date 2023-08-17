@@ -421,7 +421,8 @@ class Flow extends Controller {
   @ReadOnly(true)
   @Log(true)
   async getFlowRender(params: Record<string, any>): Promise<unknown> {
-    
+
+    const flow = await getManager().findOne(FlowModel, params.flowId as number);
     let actions = await getManager()
         .createQueryBuilder(ActionModel, "a")
         .select([
@@ -489,6 +490,7 @@ class Flow extends Controller {
     }, {});
 
     let response: any = {
+      flow,
       board: {
         columns: {
           "1-column-config-nodes": {

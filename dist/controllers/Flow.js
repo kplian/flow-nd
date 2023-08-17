@@ -289,6 +289,7 @@ let Flow = class Flow extends core_1.Controller {
         return { success: true, nodeId: newId };
     }
     async getFlowRender(params) {
+        const flow = await (0, typeorm_1.getManager)().findOne(Flow_1.default, params.flowId);
         let actions = await (0, typeorm_1.getManager)()
             .createQueryBuilder(Action_1.default, "a")
             .select([
@@ -344,6 +345,7 @@ let Flow = class Flow extends core_1.Controller {
             return acc;
         }, {});
         let response = {
+            flow,
             board: {
                 columns: {
                     "1-column-config-nodes": {

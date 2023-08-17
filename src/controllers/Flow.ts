@@ -11,6 +11,8 @@
  * 08-Jul-2021                  Jaime Rivera           Created
  * 18-Jul-2023    SP28JUL23     Mercedes Zambrana      Add deleteFlow, saveFlowName, duplicateFlow
  * 02-Aug-2023    SP11AUG23     Mercedes Zambrana      Add validations in deleteFlow and saveFlow
+ * 15-Aug-2023    SP25AUG23     Rensi Arteaga          Add logic to duplicate flows templates
+ * 17-Aug-2023    SP25AUG23     Mercedes Zambrana      Add insertEventFlow
  * ******************************************************************************
  */
 
@@ -204,7 +206,7 @@ class Flow extends Controller {
 
     const flowData = await manager.findOne(FlowModel, params.flowId);
 
-    if (flowData){
+    if (flowData) {
       const flowToClone = {
         ...flowData,
         flowId: undefined as any,
@@ -212,14 +214,19 @@ class Flow extends Controller {
         createdAt: undefined as any
       }
 
-      const flowDataClone:any = await manager.save(FlowModel, {...flowToClone, name: `${flowData.name} Copy`});
+      let flowDataClone:any
 
-
+       //if we have a vendoId as parameter the origin is a template
+      if(params.vendorId) {
+         flowDataClone = await manager.save(FlowModel, {...flowToClone, name: `${params.name}`, vendorId: params.vendorId, type: 'custom'});
+      } else {
+         flowDataClone = await manager.save(FlowModel, {...flowToClone, name: `${flowData.name} Copy`});
+      }
 
 
       const nodesToDuplicate = await manager.find(NodeModel, { flowId: flowData?.flowId ,isActive:true});
 
-      if (nodesToDuplicate){
+      if (nodesToDuplicate) {
         const originalNodeIds = nodesToDuplicate.map((node) => node.nodeId);
         const duplicatedNodes = nodesToDuplicate.map((node) => {
           const duplicatedNode = manager.create(NodeModel, { ...node, nodeId:undefined as any });
@@ -249,14 +256,10 @@ class Flow extends Controller {
         await manager.save(duplicatedConnections);
 
       }
-      return {success:true}
+      return { success:true, flowId: flowDataClone.flowId }
     }else{
-      return {success:false, "respuesta": "No Flow"}
+      return { success:false, "respuesta": "No Flow" }
     }
-
-
-
-
 
   }
 
@@ -423,6 +426,26 @@ class Flow extends Controller {
   async getFlowRender(params: Record<string, any>): Promise<unknown> {
 
     const flow = await getManager().findOne(FlowModel, params.flowId as number);
+    const totalNodes =  await getManager()
+        .createQueryBuilder(NodeModel, "n")
+        .select([
+          "n.nodeId",
+          "a.originName"
+        ])
+        .innerJoin("n.action", "a")
+        .where(`n.isActive = 1 and n.flowId = :flowId`, { flowId: params.flowId as number })
+        .getOne();
+
+    let cond = " and 0=0";
+
+    if (!totalNodes){
+      cond =  " and at.name= 'EVENT' ";
+    }else{
+      const oName= totalNodes?.action?.originName;
+//
+      cond = `and at.name != 'EVENT' and (a.originName is null or a.originName = '${oName}')`;
+    }
+
     let actions = await getManager()
         .createQueryBuilder(ActionModel, "a")
         .select([
@@ -433,9 +456,11 @@ class Flow extends Controller {
           "at.name"
         ])
         .innerJoin("a.actionType", "at")
-        .where(`a.isActive = 1 and a.hidden = 'N'`)
+        .where(`a.isActive = 1 and a.hidden = 'N'` + cond)
         .getMany();
-    
+
+
+
     const connections = await getManager()
         .createQueryBuilder(NodeConnectionModel, "nc")
         .select([
@@ -547,6 +572,53 @@ class Flow extends Controller {
     });
   
     return sortedNodes;
+  }
+
+
+
+  @Post()
+  @DbSettings('Orm')
+  @ReadOnly(false)
+  @Log(true)
+  async insertEventFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+
+    let dataFlow = await __(FlowModel.findOne(params.flowId));
+    if (dataFlow){
+
+      let action = await getManager()
+          .createQueryBuilder(ActionModel, "a")
+          .select([
+            "a.actionId"
+          ])
+          .innerJoin("a.actionType", "at")
+          .where(`a.isActive = 1 and a.hidden = 'N' and at.name = 'EVENT' and at.isActive = 1 `, { actionId: params.actionId as number } )
+          .getMany();
+
+      if (action){
+        const newNode = manager.create(NodeModel, {
+          nodeId : undefined,
+          flowId: params.flowId,
+          isInit: 'N',
+          actionId: params.actionId
+        });
+        const saveNode = await manager.save(newNode);
+        const id = saveNode.nodeId;
+
+        const newConnection = manager.create(NodeConnectionModel, {
+          nodeConnectionId : undefined,
+          nodeIdMaster: null,
+          nodeIdChild: id,
+        });
+        const savedNodes = await manager.save(newConnection);
+        return {success:true, nodeId: id}
+      }else{
+        return { success : false, msg: "Action not found or is not event type" };
+      }
+
+    }else{
+      return { success : false , msg: "Flow not found"};
+    }
+
   }
 
 

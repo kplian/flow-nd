@@ -12,6 +12,8 @@
  * 08-Jul-2021                  Jaime Rivera           Created
  * 18-Jul-2023    SP28JUL23     Mercedes Zambrana      Add deleteFlow, saveFlowName, duplicateFlow
  * 02-Aug-2023    SP11AUG23     Mercedes Zambrana      Add validations in deleteFlow and saveFlow
+ * 15-Aug-2023    SP25AUG23     Rensi Arteaga          Add logic to duplicate flows templates
+ * 17-Aug-2023    SP25AUG23     Mercedes Zambrana      Add insertEventFlow
  * ******************************************************************************
  */
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
@@ -151,7 +153,14 @@ let Flow = class Flow extends core_1.Controller {
                 nodes: [],
                 createdAt: undefined
             };
-            const flowDataClone = await manager.save(Flow_1.default, { ...flowToClone, name: `${flowData.name} Copy` });
+            let flowDataClone;
+            //if we have a vendoId as parameter the origin is a template
+            if (params.vendorId) {
+                flowDataClone = await manager.save(Flow_1.default, { ...flowToClone, name: `${params.name}`, vendorId: params.vendorId, type: 'custom' });
+            }
+            else {
+                flowDataClone = await manager.save(Flow_1.default, { ...flowToClone, name: `${flowData.name} Copy` });
+            }
             const nodesToDuplicate = await manager.find(Node_1.default, { flowId: flowData === null || flowData === void 0 ? void 0 : flowData.flowId, isActive: true });
             if (nodesToDuplicate) {
                 const originalNodeIds = nodesToDuplicate.map((node) => node.nodeId);
@@ -175,7 +184,7 @@ let Flow = class Flow extends core_1.Controller {
                 });
                 await manager.save(duplicatedConnections);
             }
-            return { success: true };
+            return { success: true, flowId: flowDataClone.flowId };
         }
         else {
             return { success: false, "respuesta": "No Flow" };
@@ -289,7 +298,26 @@ let Flow = class Flow extends core_1.Controller {
         return { success: true, nodeId: newId };
     }
     async getFlowRender(params) {
+        var _a;
         const flow = await (0, typeorm_1.getManager)().findOne(Flow_1.default, params.flowId);
+        const totalNodes = await (0, typeorm_1.getManager)()
+            .createQueryBuilder(Node_1.default, "n")
+            .select([
+            "n.nodeId",
+            "a.originName"
+        ])
+            .innerJoin("n.action", "a")
+            .where(`n.isActive = 1 and n.flowId = :flowId`, { flowId: params.flowId })
+            .getOne();
+        let cond = " and 0=0";
+        if (!totalNodes) {
+            cond = " and at.name= 'EVENT' ";
+        }
+        else {
+            const oName = (_a = totalNodes === null || totalNodes === void 0 ? void 0 : totalNodes.action) === null || _a === void 0 ? void 0 : _a.originName;
+            //
+            cond = `and at.name != 'EVENT' and (a.originName is null or a.originName = '${oName}')`;
+        }
         let actions = await (0, typeorm_1.getManager)()
             .createQueryBuilder(Action_1.default, "a")
             .select([
@@ -300,7 +328,7 @@ let Flow = class Flow extends core_1.Controller {
             "at.name"
         ])
             .innerJoin("a.actionType", "at")
-            .where(`a.isActive = 1 and a.hidden = 'N'`)
+            .where(`a.isActive = 1 and a.hidden = 'N'` + cond)
             .getMany();
         const connections = await (0, typeorm_1.getManager)()
             .createQueryBuilder(NodeConnection_1.default, "nc")
@@ -393,6 +421,42 @@ let Flow = class Flow extends core_1.Controller {
         });
         return sortedNodes;
     }
+    async insertEventFlow(params, manager) {
+        let dataFlow = await (0, core_1.__)(Flow_1.default.findOne(params.flowId));
+        if (dataFlow) {
+            let action = await (0, typeorm_1.getManager)()
+                .createQueryBuilder(Action_1.default, "a")
+                .select([
+                "a.actionId"
+            ])
+                .innerJoin("a.actionType", "at")
+                .where(`a.isActive = 1 and a.hidden = 'N' and at.name = 'EVENT' and at.isActive = 1 `, { actionId: params.actionId })
+                .getMany();
+            if (action) {
+                const newNode = manager.create(Node_1.default, {
+                    nodeId: undefined,
+                    flowId: params.flowId,
+                    isInit: 'N',
+                    actionId: params.actionId
+                });
+                const saveNode = await manager.save(newNode);
+                const id = saveNode.nodeId;
+                const newConnection = manager.create(NodeConnection_1.default, {
+                    nodeConnectionId: undefined,
+                    nodeIdMaster: null,
+                    nodeIdChild: id,
+                });
+                const savedNodes = await manager.save(newConnection);
+                return { success: true, nodeId: id };
+            }
+            else {
+                return { success: false, msg: "Action not found or is not event type" };
+            }
+        }
+        else {
+            return { success: false, msg: "Flow not found" };
+        }
+    }
 };
 __decorate([
     (0, core_1.Get)(),
@@ -457,6 +521,15 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], Flow.prototype, "getFlowRender", null);
+__decorate([
+    (0, core_1.Post)(),
+    (0, core_1.DbSettings)('Orm'),
+    (0, core_1.ReadOnly)(false),
+    (0, core_1.Log)(true),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
+    __metadata("design:returntype", Promise)
+], Flow.prototype, "insertEventFlow", null);
 Flow = __decorate([
     (0, core_1.Model)('flow-nd/Flow')
 ], Flow);

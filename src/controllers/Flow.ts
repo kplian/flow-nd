@@ -12,6 +12,7 @@
  * 18-Jul-2023    SP28JUL23     Mercedes Zambrana      Add deleteFlow, saveFlowName, duplicateFlow
  * 02-Aug-2023    SP11AUG23     Mercedes Zambrana      Add validations in deleteFlow and saveFlow
  * 15-Aug-2023    SP25AUG23     Rensi Arteaga          Add logic to duplicate flows templates
+ * 17-Aug-2023    SP25AUG23     Mercedes Zambrana      Add insertEventFlow
  * ******************************************************************************
  */
 
@@ -426,17 +427,23 @@ class Flow extends Controller {
     const totalNodes =  await getManager()
         .createQueryBuilder(NodeModel, "n")
         .select([
-          "n.nodeId"
+          "n.nodeId",
+          "a.originName"
         ])
+        .innerJoin("n.action", "a")
         .where(`n.isActive = 1 and n.flowId = :flowId`, { flowId: params.flowId as number })
-        .getMany();
+        .getOne();
 
     let cond = " and 0=0";
-    console.log ('total:::::::', totalNodes.length);
-    if (totalNodes.length === 0){
+
+    if (!totalNodes){
       cond =  " and at.name= 'EVENT' ";
+    }else{
+      const oName= totalNodes?.action?.originName;
+//
+      cond = `and at.name != 'EVENT' and (a.originName is null or a.originName = '${oName}')`;
     }
-console.log ("la condicion essss:", cond);
+
     let actions = await getManager()
         .createQueryBuilder(ActionModel, "a")
         .select([
@@ -451,7 +458,7 @@ console.log ("la condicion essss:", cond);
         .getMany();
 
 
-    
+
     const connections = await getManager()
         .createQueryBuilder(NodeConnectionModel, "nc")
         .select([
@@ -583,7 +590,7 @@ console.log ("la condicion essss:", cond);
           .innerJoin("a.actionType", "at")
           .where(`a.isActive = 1 and a.hidden = 'N' and at.name = 'EVENT' and at.isActive = 1 `, { actionId: params.actionId as number } )
           .getMany();
-console.log ("actionnnnnn:: ", action);
+
       if (action){
         const newNode = manager.create(NodeModel, {
           nodeId : undefined,

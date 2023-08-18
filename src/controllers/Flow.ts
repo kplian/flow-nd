@@ -13,6 +13,7 @@
  * 02-Aug-2023    SP11AUG23     Mercedes Zambrana      Add validations in deleteFlow and saveFlow
  * 15-Aug-2023    SP25AUG23     Rensi Arteaga          Add logic to duplicate flows templates
  * 17-Aug-2023    SP25AUG23     Mercedes Zambrana      Add insertEventFlow
+ * 18-Aug-2023    SP25AUG23     Mercedes Zambrana      Add removeFlow
  * ******************************************************************************
  */
 
@@ -614,6 +615,46 @@ class Flow extends Controller {
 
     }else{
       return { success : false , msg: "Flow not found"};
+    }
+
+  }
+
+
+
+
+  @Post()
+  @DbSettings('Orm')
+  @ReadOnly(false)
+  @Log(true)
+  async removeFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+
+    const flowId = params.flowId;
+    let dataFlow = await __(FlowModel.findOne(flowId));
+    if (dataFlow) {
+
+      const nodesToDelete = await manager.find(NodeModel, {flowId});
+
+
+      const nodeIdsToDelete = nodesToDelete.map(node => node.nodeId);
+      const nodeConnectionsToDelete = await manager.find(NodeConnectionModel, {
+        where: [
+          {nodeIdMaster: In(nodeIdsToDelete)},
+          {nodeIdChild: In(nodeIdsToDelete)}
+        ]
+      });
+
+
+      await manager.remove(nodeConnectionsToDelete);
+
+
+      await manager.remove(nodesToDelete);
+
+
+      await manager.remove(dataFlow);
+
+      return {success: true};
+    }else{
+      return {success: false}
     }
 
   }

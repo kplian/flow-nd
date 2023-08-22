@@ -12,7 +12,7 @@
  * 08-Jul-2021                  Jaime Rivera           Created
  * 18-Jul-2023    SP28JUL23     Mercedes Zambrana      Add deleteFlow, saveFlowName, duplicateFlow
  * 02-Aug-2023    SP11AUG23     Mercedes Zambrana      Add validations in deleteFlow and saveFlow
- * 15-Aug-2023    SP25AUG23     Rensi Arteaga          Add logic to duplicate flows templates
+ * 15-Aug-2023    SP25AUG23     Rensi Arteaga          Add logic to duplicate flows templates nadd icons
  * 17-Aug-2023    SP25AUG23     Mercedes Zambrana      Add insertEventFlow
  * 18-Aug-2023    SP25AUG23     Mercedes Zambrana      Add removeFlow
  * ******************************************************************************
@@ -326,6 +326,7 @@ let Flow = class Flow extends core_1.Controller {
             "a.code",
             "a.name",
             "a.description",
+            "a.icon",
             "at.name"
         ])
             .innerJoin("a.actionType", "at")
@@ -348,6 +349,7 @@ let Flow = class Flow extends core_1.Controller {
             "a.code",
             "a.name",
             "a.description",
+            "a.icon",
         ])
             .innerJoin("n.action", "a")
             .where(`n.isActive = 1 and n.flowId = :flowId`, { flowId: params.flowId })

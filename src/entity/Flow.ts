@@ -41,6 +41,9 @@ export default class Flow extends PxpEntity{
 	@OneToMany( () => Node, node => node.flow)
 	nodes: Node[];
 
+	@Column({ type: 'varchar',   length: 200 })
+	icon: string;
+
 
 
 }

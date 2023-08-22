@@ -665,6 +665,28 @@ class Flow extends Controller {
   }
 
 
+  @Post()
+  @DbSettings('Orm')
+  @ReadOnly(false)
+  @Log(true)
+  async changeStatusFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+
+    let dataFlow = await __(FlowModel.findOne(params.flowId));
+    if (dataFlow){
+      if (dataFlow.status ==='draft' || dataFlow.status ==='paused'){
+        //change to active
+         dataFlow.status = 'active';
+      }else if (dataFlow.status ==='active'){
+         dataFlow.status = 'paused';
+      }
+      const updFlow = await __(manager.save(dataFlow));
+      return {success : true}
+    }else{
+      return { success : false }
+    }
+
+  }
+
 }
 
 export default Flow;

@@ -14,6 +14,7 @@
  * 02-Aug-2023    SP11AUG23     Mercedes Zambrana      Add validations in deleteFlow and saveFlow
  * 15-Aug-2023    SP25AUG23     Rensi Arteaga          Add logic to duplicate flows templates
  * 17-Aug-2023    SP25AUG23     Mercedes Zambrana      Add insertEventFlow
+ * 18-Aug-2023    SP25AUG23     Mercedes Zambrana      Add removeFlow
  * ******************************************************************************
  */
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
@@ -457,6 +458,27 @@ let Flow = class Flow extends core_1.Controller {
             return { success: false, msg: "Flow not found" };
         }
     }
+    async removeFlow(params, manager) {
+        const flowId = params.flowId;
+        let dataFlow = await (0, core_1.__)(Flow_1.default.findOne(flowId));
+        if (dataFlow) {
+            const nodesToDelete = await manager.find(Node_1.default, { flowId });
+            const nodeIdsToDelete = nodesToDelete.map(node => node.nodeId);
+            const nodeConnectionsToDelete = await manager.find(NodeConnection_1.default, {
+                where: [
+                    { nodeIdMaster: (0, typeorm_1.In)(nodeIdsToDelete) },
+                    { nodeIdChild: (0, typeorm_1.In)(nodeIdsToDelete) }
+                ]
+            });
+            await manager.remove(nodeConnectionsToDelete);
+            await manager.remove(nodesToDelete);
+            await manager.remove(dataFlow);
+            return { success: true };
+        }
+        else {
+            return { success: false };
+        }
+    }
 };
 __decorate([
     (0, core_1.Get)(),
@@ -530,6 +552,15 @@ __decorate([
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
 ], Flow.prototype, "insertEventFlow", null);
+__decorate([
+    (0, core_1.Post)(),
+    (0, core_1.DbSettings)('Orm'),
+    (0, core_1.ReadOnly)(false),
+    (0, core_1.Log)(true),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
+    __metadata("design:returntype", Promise)
+], Flow.prototype, "removeFlow", null);
 Flow = __decorate([
     (0, core_1.Model)('flow-nd/Flow')
 ], Flow);

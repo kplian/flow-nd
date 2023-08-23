@@ -95,6 +95,7 @@ class Node extends Controller {
   @ReadOnly(false)
   @Log(true)
   async getParameterizedNode(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+    console.log('getParameterizedNode llega');
     _.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
 
     const { nodeId, flowId, substitutionsSchemaJson = {} } = params;
@@ -125,6 +126,11 @@ class Node extends Controller {
     ]);*/
 
     const {actionConfigJson, action: { schemaJson, configJsonTemplate , actionType: { schemaJson: schemaJsonFromActionType }}} = nodeData;
+    console.log('nodeData actionConfigJson',actionConfigJson)
+    console.log('action schemaJson',schemaJson)
+    console.log('action configJsonTemplate',configJsonTemplate)
+    console.log('actionType schemaJsonFromActionType',schemaJsonFromActionType)
+    console.log('actionType fieldMapData',fieldMapData)
 
     const actionConfigJsonObject = actionConfigJson ? JSON.parse(actionConfigJson) : {};
     const configJsonTemplateObject = configJsonTemplate ? JSON.parse(configJsonTemplate) : {};
@@ -212,6 +218,7 @@ class Node extends Controller {
       }
       return undefined;
     }
+    console.log('mergeValues',mergeValues)
     for (const [nameKey, value] of Object.entries(mergeValues)) {
       if(schemaJsonObject[nameKey]) {
         const descValue = await __(findFieldInConfigForComponent(schemaJsonObject[nameKey], value));
@@ -223,8 +230,9 @@ class Node extends Controller {
         }
       }
     }
+    console.log('111 schemaJsonObject',schemaJsonObject)
 
-    Object.entries(schemaJsonObject)
+    /*Object.entries(schemaJsonObject)
         .filter(([, value]: [nameKey: string, value: any]) => value.initialValue === undefined && value.fromFieldMap === undefined && value.fieldMappingType)
         .forEach(([nameKey]) => {
           const hasUniqueByTypeInMappingData = findFieldMapUniqueByType(schemaJsonObject[nameKey].fieldMappingType);
@@ -232,7 +240,9 @@ class Node extends Controller {
             ...schemaJsonObject[nameKey],
             ...(hasUniqueByTypeInMappingData && { fromFieldMap: true, ...hasUniqueByTypeInMappingData }),
           };
-        })
+        })*/
+    console.log('222 schemaJsonObject',schemaJsonObject)
+
 
     return {
       actionConfigJsonObject,

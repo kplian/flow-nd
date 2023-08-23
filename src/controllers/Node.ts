@@ -98,24 +98,26 @@ class Node extends Controller {
     _.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
 
     const { nodeId, flowId, substitutionsSchemaJson = {} } = params;
+    const tNodeData =  __(NodeModel.findOne(nodeId));
+    const nodeData = await tNodeData;
+
     const tNodeOrigin =  await __(NodeModel.findOne({
       relations: ['action'],
       where: {
-        flowId: flowId,
+        flowId: nodeData.flowId,
         isInit: 'Y',
         action: {
           originName: Not(IsNull())
         }
       }
     }));
-    const tNodeData =  __(NodeModel.findOne(nodeId));
     const tFieldMapData =  __(manager.createQueryBuilder(FieldMapEntity, 'fm')
         .innerJoin(OriginNameEntity, 'on', 'on.originNameId = fm.originNameId')
         .where("on.name = :n ", {n: tNodeOrigin.action.originName})
         .getMany());
 
     //const nodeOrigin = await tNodeOrigin; todo
-    const nodeData = await tNodeData;
+    
     const fieldMapData = await tFieldMapData;
     /*const [nodeData, fieldMapData] = await Promise.all([
       tNodeData,

@@ -44,6 +44,7 @@ export default class Flow extends PxpEntity{
 	@Column({ type: 'varchar',   length: 200 })
 	icon: string;
 
-
+	@Column({ type: 'varchar',   length: 30 })
+	status: string;
 
 }

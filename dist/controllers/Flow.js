@@ -484,12 +484,12 @@ let Flow = class Flow extends core_1.Controller {
     async changeStatusFlow(params, manager) {
         let dataFlow = await (0, core_1.__)(Flow_1.default.findOne(params.flowId));
         if (dataFlow) {
-            if (dataFlow.status === 'draft' || dataFlow.status === 'paused') {
+            if (dataFlow.status === 'off') {
                 //change to active
-                dataFlow.status = 'active';
+                dataFlow.status = 'on';
             }
-            else if (dataFlow.status === 'active') {
-                dataFlow.status = 'paused';
+            else {
+                dataFlow.status = 'off';
             }
             const updFlow = await (0, core_1.__)(manager.save(dataFlow));
             return { success: true };

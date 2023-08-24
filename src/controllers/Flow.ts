@@ -673,11 +673,11 @@ class Flow extends Controller {
 
     let dataFlow = await __(FlowModel.findOne(params.flowId));
     if (dataFlow){
-      if (dataFlow.status ==='draft' || dataFlow.status ==='paused'){
+      if (dataFlow.status ==='off' ){
         //change to active
-         dataFlow.status = 'active';
-      }else if (dataFlow.status ==='active'){
-         dataFlow.status = 'paused';
+         dataFlow.status = 'on';
+      }else {
+         dataFlow.status = 'off';
       }
       const updFlow = await __(manager.save(dataFlow));
       return {success : true}

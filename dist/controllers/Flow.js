@@ -439,7 +439,7 @@ let Flow = class Flow extends core_1.Controller {
                 const newNode = manager.create(Node_1.default, {
                     nodeId: undefined,
                     flowId: params.flowId,
-                    isInit: 'N',
+                    isInit: 'Y',
                     actionId: params.actionId
                 });
                 const saveNode = await manager.save(newNode);
@@ -490,6 +490,7 @@ let Flow = class Flow extends core_1.Controller {
             }
             else {
                 dataFlow.status = 'off';
+
             }
             const updFlow = await (0, core_1.__)(manager.save(dataFlow));
             return { success: true };

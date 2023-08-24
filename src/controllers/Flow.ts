@@ -601,7 +601,7 @@ class Flow extends Controller {
         const newNode = manager.create(NodeModel, {
           nodeId : undefined,
           flowId: params.flowId,
-          isInit: 'N',
+          isInit: 'Y',
           actionId: params.actionId
         });
         const saveNode = await manager.save(newNode);

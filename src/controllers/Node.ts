@@ -95,27 +95,30 @@ class Node extends Controller {
   @ReadOnly(false)
   @Log(true)
   async getParameterizedNode(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+    console.log('getParameterizedNode llega');
     _.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
 
     const { nodeId, flowId, substitutionsSchemaJson = {} } = params;
+    const tNodeData =  __(NodeModel.findOne(nodeId));
+    const nodeData = await tNodeData;
+
     const tNodeOrigin =  await __(NodeModel.findOne({
       relations: ['action'],
       where: {
-        flowId: flowId,
+        flowId: nodeData.flowId,
         isInit: 'Y',
         action: {
           originName: Not(IsNull())
         }
       }
     }));
-    const tNodeData =  __(NodeModel.findOne(nodeId));
     const tFieldMapData =  __(manager.createQueryBuilder(FieldMapEntity, 'fm')
         .innerJoin(OriginNameEntity, 'on', 'on.originNameId = fm.originNameId')
         .where("on.name = :n ", {n: tNodeOrigin.action.originName})
         .getMany());
 
     //const nodeOrigin = await tNodeOrigin; todo
-    const nodeData = await tNodeData;
+    
     const fieldMapData = await tFieldMapData;
     /*const [nodeData, fieldMapData] = await Promise.all([
       tNodeData,
@@ -123,6 +126,11 @@ class Node extends Controller {
     ]);*/
 
     const {actionConfigJson, action: { schemaJson, configJsonTemplate , actionType: { schemaJson: schemaJsonFromActionType }}} = nodeData;
+    console.log('nodeData actionConfigJson',actionConfigJson)
+    console.log('action schemaJson',schemaJson)
+    console.log('action configJsonTemplate',configJsonTemplate)
+    console.log('actionType schemaJsonFromActionType',schemaJsonFromActionType)
+    console.log('actionType fieldMapData',fieldMapData)
 
     const actionConfigJsonObject = actionConfigJson ? JSON.parse(actionConfigJson) : {};
     const configJsonTemplateObject = configJsonTemplate ? JSON.parse(configJsonTemplate) : {};
@@ -210,6 +218,7 @@ class Node extends Controller {
       }
       return undefined;
     }
+    console.log('mergeValues',mergeValues)
     for (const [nameKey, value] of Object.entries(mergeValues)) {
       if(schemaJsonObject[nameKey]) {
         const descValue = await __(findFieldInConfigForComponent(schemaJsonObject[nameKey], value));
@@ -221,8 +230,9 @@ class Node extends Controller {
         }
       }
     }
+    console.log('111 schemaJsonObject',schemaJsonObject)
 
-    Object.entries(schemaJsonObject)
+    /*Object.entries(schemaJsonObject)
         .filter(([, value]: [nameKey: string, value: any]) => value.initialValue === undefined && value.fromFieldMap === undefined && value.fieldMappingType)
         .forEach(([nameKey]) => {
           const hasUniqueByTypeInMappingData = findFieldMapUniqueByType(schemaJsonObject[nameKey].fieldMappingType);
@@ -230,7 +240,9 @@ class Node extends Controller {
             ...schemaJsonObject[nameKey],
             ...(hasUniqueByTypeInMappingData && { fromFieldMap: true, ...hasUniqueByTypeInMappingData }),
           };
-        })
+        })*/
+    console.log('222 schemaJsonObject',schemaJsonObject)
+
 
     return {
       actionConfigJsonObject,

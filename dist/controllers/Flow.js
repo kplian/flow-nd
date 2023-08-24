@@ -490,7 +490,6 @@ let Flow = class Flow extends core_1.Controller {
             }
             else {
                 dataFlow.status = 'off';
-
             }
             const updFlow = await (0, core_1.__)(manager.save(dataFlow));
             return { success: true };

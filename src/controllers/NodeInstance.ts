@@ -30,6 +30,7 @@ import {
 import NodeConnection from "../entity/NodeConnection";
 import NodeInstanceModel from "../entity/NodeInstance";
 import Node from "../entity/Node";
+import FlowLog from "../entity/FlowLog";
 import axios from "axios";
 import ActionType from "../entity/ActionType";
 import Action from "../entity/Action";
@@ -41,88 +42,95 @@ import { GlobalData } from "@pxp-nd/common";
 
 @Model("flow-nd/NodeInstance")
 class NodeInstance extends Controller {
-  async RecursiveInstance(params: Record<string, any>): Promise<unknown> {
+  async RecursiveInstance(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
     //https://lodash.com/docs/4.17.15#template
     _.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
     //todo after this we need to get the json variables and execute the view and conditions configured in the database
     const { node, flowInstance, eventNode } = params;
+    try {
+      const executeView = `select * from ${flowInstance.originName} where ${flowInstance.originKey} = ${flowInstance.dataId}`;
+      const resExecuteView = await __(getManager().query(executeView));
+      const resultFromOrigin = resExecuteView[0];
 
-    const executeView = `select * from ${flowInstance.originName} where ${flowInstance.originKey} = ${flowInstance.dataId}`;
-    const resExecuteView = await __(getManager().query(executeView));
-    const resultFromOrigin = resExecuteView[0];
-
-    let mergeJson = {};
-    const {
-      actionConfigJson,
-      action: {
-        configJsonTemplate,
-        actionType: { schemaJson },
-      },
-    } = node;
-    if (configJsonTemplate !== "" || actionConfigJson !== "") {
-      const actionConfigJsonObject =
-        actionConfigJson &&
-        JSON.parse(_.template(actionConfigJson)(resultFromOrigin));
-      const configJsonTemplateObject =
-        configJsonTemplate &&
-        JSON.parse(_.template(configJsonTemplate)(resultFromOrigin));
-      mergeJson = {
-        ...(configJsonTemplateObject || {}), // first object must be of the node table
-        ...(actionConfigJsonObject || {}),
-        __resultFromOrigin: resultFromOrigin,
-      };
-    }
-
-    let nodeInstance = new NodeInstanceModel();
-    nodeInstance.flowInstanceId = flowInstance.flowInstanceId;
-    // @ts-ignore
-    nodeInstance.nodeId = node.nodeId;
-    nodeInstance.runTime = new Date();
-
-    if (node.action.actionType.isDelay === "Y") {
-      const delay = node.delay;
-      const typeDelay = node.typeDelay;
-      nodeInstance.schedule = moment().add(delay, typeDelay).toDate();
-      nodeInstance.status = "WAIT";
-      await getManager().save(NodeInstanceModel, nodeInstance);
-    } else {
-      if (node.action.actionType.controller) {
-        const data = "";
-
-        const config = {
-          method: "post",
-          url: `http://localhost:${process.env.PORT}/api/${node.action.actionType.controller}`,
-          headers: {
-            Authorization: "" + process.env.TOKEN_PXP_ND + "",
-            "Content-Type": "application/json",
-          },
-          data: mergeJson,
+      let mergeJson = {};
+      const {
+        actionConfigJson,
+        action: {
+          configJsonTemplate,
+          actionType: { schemaJson },
+        },
+      } = node;
+      if (configJsonTemplate !== "" || actionConfigJson !== "") {
+        const actionConfigJsonObject =
+          actionConfigJson &&
+          JSON.parse(_.template(actionConfigJson)(resultFromOrigin));
+        const configJsonTemplateObject =
+          configJsonTemplate &&
+          JSON.parse(_.template(configJsonTemplate)(resultFromOrigin));
+        mergeJson = {
+          ...(configJsonTemplateObject || {}), // first object must be of the node table
+          ...(actionConfigJsonObject || {}),
+          __resultFromOrigin: resultFromOrigin,
         };
-
-        // @ts-ignore
-        const resControllerAxios = await __(axios(config));
       }
 
-      await getManager().save(NodeInstanceModel, nodeInstance);
+      let nodeInstance = new NodeInstanceModel();
+      nodeInstance.flowInstanceId = flowInstance.flowInstanceId;
       // @ts-ignore
-      const nodeConnectionList = await __(
-        NodeConnection.find({ where: { nodeIdMaster: node.nodeId } })
-      );
+      nodeInstance.nodeId = node.nodeId;
+      nodeInstance.runTime = new Date();
 
-      for (const nodeConnection of nodeConnectionList) {
-        const condition = _.template(nodeConnection.condition)(
-          resultFromOrigin
+      if (node.action.actionType.isDelay === "Y") {
+        const delay = node.delay;
+        const typeDelay = node.typeDelay;
+        nodeInstance.schedule = moment().add(delay, typeDelay).toDate();
+        nodeInstance.status = "WAIT";
+        await manager.save(NodeInstanceModel, nodeInstance);
+      } else {
+        if (node.action.actionType.controller) {
+          const data = "";
+
+          const config = {
+            method: "post",
+            url: `http://localhost:${process.env.PORT}/api/${node.action.actionType.controller}`,
+            headers: {
+              Authorization: "" + process.env.TOKEN_PXP_ND + "",
+              "Content-Type": "application/json",
+            },
+            data: mergeJson,
+          };
+
+          // @ts-ignore
+          const resControllerAxios = await __(axios(config));
+        }
+
+        await manager.save(NodeInstanceModel, nodeInstance);
+        // @ts-ignore
+        const nodeConnectionList = await __(
+          NodeConnection.find({ where: { nodeIdMaster: node.nodeId } })
         );
-        const evalCondition = eval(condition) as boolean;
-        if (evalCondition) {
-          const nodeRes = await __(Node.findOne(nodeConnection.nodeIdChild));
-          await this.RecursiveInstance({
-            node: nodeRes,
-            flowInstance,
-            resultFromOrigin,
-          });
+
+        for (const nodeConnection of nodeConnectionList) {
+          const condition = _.template(nodeConnection.condition)(
+            resultFromOrigin
+          );
+          const evalCondition = eval(condition) as boolean;
+          if (!nodeConnection.condition || evalCondition) {
+            const nodeRes = await __(Node.findOne(nodeConnection.nodeIdChild));
+            await this.RecursiveInstance({
+              node: nodeRes,
+              flowInstance,
+              resultFromOrigin,
+            }, manager);
+          }
         }
       }
+    } catch (error) {
+      const log = new FlowLog();
+      log.errorCustomMessage = `Error executing ${flowInstance.flowInstanceId} in NodeInstance-> RecursiveInstance `;
+      log.errorMessage =  error.message;
+      log.stackTrace = error.stack || '';
+      getManager().save(log);
     }
 
     return {};
@@ -191,7 +199,7 @@ class NodeInstance extends Controller {
                 node: nodeRes,
                 flowInstance,
                 resultFromOrigin,
-              });
+              }, manager);
               //update status from wait to executed
               await __(
                 manager.update(NodeInstanceModel, nodeInstance.nodeInstanceId, {

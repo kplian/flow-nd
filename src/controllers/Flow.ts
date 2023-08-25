@@ -108,6 +108,7 @@ class Flow extends Controller {
     Object.assign(newFlow, flowToCopy);
     newFlow.name = params.name;
     newFlow.description = params.description;
+    newFlow.status = 'off';
     const insertNewFlow = await __(manager.save(FlowModel, newFlow));
 
     // create the nodes
@@ -212,7 +213,8 @@ class Flow extends Controller {
         ...flowData,
         flowId: undefined as any,
         nodes: [] as any[],
-        createdAt: undefined as any
+        createdAt: undefined as any,
+        status: 'off'
       }
 
       let flowDataClone:any

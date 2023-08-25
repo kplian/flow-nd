@@ -90,6 +90,7 @@ let Flow = class Flow extends core_1.Controller {
         Object.assign(newFlow, flowToCopy);
         newFlow.name = params.name;
         newFlow.description = params.description;
+        newFlow.status = 'off';
         const insertNewFlow = await (0, core_1.__)(manager.save(Flow_1.default, newFlow));
         // create the nodes
         // get the first node "the trigger node"
@@ -152,7 +153,8 @@ let Flow = class Flow extends core_1.Controller {
                 ...flowData,
                 flowId: undefined,
                 nodes: [],
-                createdAt: undefined
+                createdAt: undefined,
+                status: 'off'
             };
             let flowDataClone;
             //if we have a vendoId as parameter the origin is a template

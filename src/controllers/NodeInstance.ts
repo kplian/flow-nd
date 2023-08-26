@@ -81,8 +81,9 @@ class NodeInstance extends Controller {
       nodeInstance.runTime = new Date();
 
       if (node.action.actionType.isDelay === "Y") {
-        const delay = node.delay;
-        const typeDelay = node.typeDelay;
+        const delayData = JSON.parse(node.actionConfigJson);
+        const delay = delayData.quantity;
+        const typeDelay = delayData.type;
         nodeInstance.schedule = moment().add(delay, typeDelay).toDate();
         nodeInstance.status = "WAIT";
         await manager.save(NodeInstanceModel, nodeInstance);

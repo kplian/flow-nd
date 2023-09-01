@@ -15,6 +15,7 @@
  * 15-Aug-2023    SP25AUG23     Rensi Arteaga          Add logic to duplicate flows templates nadd icons
  * 17-Aug-2023    SP25AUG23     Mercedes Zambrana      Add insertEventFlow
  * 18-Aug-2023    SP25AUG23     Mercedes Zambrana      Add removeFlow
+ * 01-Sep-2023    SP08SEP23     Rensi Arteaga          add basi flow list
  * ******************************************************************************
  */
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
@@ -500,6 +501,83 @@ let Flow = class Flow extends core_1.Controller {
             return { success: false };
         }
     }
+    async basicFlowList(params) {
+        const isActive = params._isActive;
+        const type = params._type;
+        const vendorId = params._vendorId;
+        const queryBuilder = await (0, typeorm_1.getManager)()
+            .createQueryBuilder()
+            .select([
+            'f.flow_id as flowId ',
+            'f.vendor_id as vendorId',
+            'f.code as code',
+            'f.name as name',
+            'f.enabled as enabled',
+            'f.type as type',
+            'f.created_by as createdBy',
+            'f.user_id_ai as userIdAi',
+            'f.user_ai as userAi',
+            'f.modified_by as modifiedBy',
+            'f.created_at as createdAt',
+            'f.modified_at as modifiedAt',
+            'f.is_active as isActive',
+            'f.description as description',
+            'f.icon as icon',
+            'f.status as status',
+            'COUNT(fi.flow_instance_id) AS numberOfInstance',
+        ])
+            .from('twf_flow', 'f')
+            .leftJoin('twf_flow_instance', 'fi', 'fi.flow_id = f.flow_id');
+        // Optional filters
+        if (isActive !== undefined) {
+            queryBuilder.where('f.is_active = :isActive', { isActive });
+        }
+        if (type) {
+            queryBuilder.andWhere('f.type = :type', { type });
+        }
+        if (vendorId) {
+            queryBuilder.andWhere('f.vendor_id = :vendorId', { vendorId });
+        }
+        // Sorting and pagination
+        queryBuilder.orderBy(`f.${params.sort}`, params.dir).skip(params.start).take(params.limit);
+        queryBuilder.groupBy([
+            'f.flow_id',
+            'f.vendor_id',
+            'f.code',
+            'f.name',
+            'f.enabled',
+            'f.type',
+            'f.created_by',
+            'f.user_id_ai',
+            'f.user_ai',
+            'f.modified_by',
+            'f.created_at',
+            'f.modified_at',
+            'f.is_active',
+            'f.description',
+            'f.icon',
+            'f.status',
+        ]);
+        const data = await queryBuilder.getRawMany();
+        // Construct the count query
+        const countQuery = await (0, typeorm_1.getManager)()
+            .createQueryBuilder()
+            .select('COUNT(f.flow_id)', 'count')
+            .from('twf_flow', 'f');
+        // Optional filters for the count query
+        if (isActive !== undefined) {
+            countQuery.where('f.is_active = :isActive', { isActive });
+        }
+        if (type) {
+            countQuery.andWhere('f.type = :type', { type });
+        }
+        if (vendorId) {
+            countQuery.andWhere('f.vendor_id = :vendorId', { vendorId });
+        }
+        const totalCount = await countQuery.getRawOne();
+        const total = totalCount.count;
+        return { data, total };
+    }
 };
 __decorate([
     (0, core_1.Get)(),
@@ -591,6 +669,15 @@ __decorate([
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
 ], Flow.prototype, "changeStatusFlow", null);
+__decorate([
+    (0, core_1.Get)(),
+    (0, core_1.DbSettings)('Orm'),
+    (0, core_1.ReadOnly)(true),
+    (0, core_1.Log)(true),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], Flow.prototype, "basicFlowList", null);
 Flow = __decorate([
     (0, core_1.Model)('flow-nd/Flow')
 ], Flow);

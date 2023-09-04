@@ -15,7 +15,7 @@
  * 15-Aug-2023    SP25AUG23     Rensi Arteaga          Add logic to duplicate flows templates nadd icons
  * 17-Aug-2023    SP25AUG23     Mercedes Zambrana      Add insertEventFlow
  * 18-Aug-2023    SP25AUG23     Mercedes Zambrana      Add removeFlow
- * 01-Sep-2023    SP08SEP23     Rensi Arteaga          add basi flow list
+ * 01-Sep-2023    SP08SEP23     Rensi Arteaga          add base flow list
  * ******************************************************************************
  */
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
@@ -92,6 +92,8 @@ let Flow = class Flow extends core_1.Controller {
         newFlow.name = params.name;
         newFlow.description = params.description;
         newFlow.status = 'off';
+        newFlow.modifiedAt = new Date();
+        newFlow.modifiedBy = this.user.username;
         const insertNewFlow = await (0, core_1.__)(manager.save(Flow_1.default, newFlow));
         // create the nodes
         // get the first node "the trigger node"
@@ -104,6 +106,8 @@ let Flow = class Flow extends core_1.Controller {
         if (dataFlow) {
             dataFlow.isActive = 0;
             dataFlow.enabled = 'N';
+            dataFlow.modifiedAt = new Date();
+            dataFlow.modifiedBy = this.user.username;
             const updFlow = await (0, core_1.__)(manager.save(dataFlow));
             if (updFlow) {
                 let flowInstance = `UPDATE twf_flow_instance SET
@@ -140,6 +144,8 @@ let Flow = class Flow extends core_1.Controller {
         let dataFlow = await (0, core_1.__)(Flow_1.default.findOne(params.flowId));
         if (dataFlow) {
             dataFlow.name = params.name;
+            dataFlow.modifiedAt = new Date();
+            dataFlow.modifiedBy = this.user.username;
             const updFlow = await (0, core_1.__)(manager.save(dataFlow));
             return { success: true };
         }
@@ -241,7 +247,6 @@ let Flow = class Flow extends core_1.Controller {
                 else {
                     taskIds.push('new');
                 }
-                //}
             }
         }
         if (params.board.origin == 'deleteTask') {
@@ -295,9 +300,13 @@ let Flow = class Flow extends core_1.Controller {
                 });
                 masterId = id;
                 const savedNodes = await manager.save(newConnection);
-                // }
             }
-            //}
+        }
+        let dataFlow = await (0, core_1.__)(Flow_1.default.findOne(flowId));
+        if (dataFlow) {
+            dataFlow.modifiedAt = new Date();
+            dataFlow.modifiedBy = this.user.username;
+            await (0, core_1.__)(manager.save(dataFlow));
         }
         return { success: true, nodeId: newId };
     }
@@ -452,6 +461,9 @@ let Flow = class Flow extends core_1.Controller {
                     nodeIdMaster: null,
                     nodeIdChild: id,
                 });
+                dataFlow.modifiedAt = new Date();
+                dataFlow.modifiedBy = this.user.username;
+                await (0, core_1.__)(manager.save(dataFlow));
                 const savedNodes = await manager.save(newConnection);
                 return { success: true, nodeId: id };
             }
@@ -494,6 +506,8 @@ let Flow = class Flow extends core_1.Controller {
             else {
                 dataFlow.status = 'off';
             }
+            dataFlow.modifiedAt = new Date();
+            dataFlow.modifiedBy = this.user.username;
             const updFlow = await (0, core_1.__)(manager.save(dataFlow));
             return { success: true };
         }

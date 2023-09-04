@@ -1,3 +1,15 @@
+/*****************************************************************************
+ * Copyright(c) 2023 Qorus Inc
+ * All rights reserved
+ *****************************************************************************
+ * NAME: FlowListGridView.tsx
+ * DEVELOPER: Favio Figueroa
+ * DESCRIPTION:
+ * REVISIONS:
+ * Date Change      ID              Author              Description
+ * -----------      -----------     --------------      ------------------------------------
+ * 04-Sep-2023      SP08SEP23       Rensi Arteaga       add modified at and by
+ *****************************************************************************/
 import {
 	OneToMany,
 	JoinColumn,
@@ -46,5 +58,11 @@ export default class Flow extends PxpEntity{
 
 	@Column({ type: 'varchar',   length: 30 })
 	status: string;
+
+	@Column({ name: 'modified_at', type: 'timestamp', nullable: false, default: 'CURRENT_TIMESTAMP' })
+	modifiedAt: Date;
+
+	@Column({ name: 'modified_by', type: 'varchar', length: 500 })
+	modifiedBy: string;
 
 }

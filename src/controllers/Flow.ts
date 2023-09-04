@@ -14,7 +14,7 @@
  * 15-Aug-2023    SP25AUG23     Rensi Arteaga          Add logic to duplicate flows templates nadd icons
  * 17-Aug-2023    SP25AUG23     Mercedes Zambrana      Add insertEventFlow
  * 18-Aug-2023    SP25AUG23     Mercedes Zambrana      Add removeFlow
- * 01-Sep-2023    SP08SEP23     Rensi Arteaga          add basi flow list
+ * 01-Sep-2023    SP08SEP23     Rensi Arteaga          add base flow list
  * ******************************************************************************
  */
 
@@ -110,16 +110,15 @@ class Flow extends Controller {
     newFlow.name = params.name;
     newFlow.description = params.description;
     newFlow.status = 'off';
+    newFlow.modifiedAt = new Date();
+    newFlow.modifiedBy = this.user.username
     const insertNewFlow = await __(manager.save(FlowModel, newFlow));
 
     // create the nodes
 
     // get the first node "the trigger node"
     const dataNode = await NodeModel.findOne({ where: {flowId: params.flowId }, order: {nodeId: "ASC"}});
-
     dataNode && await this.copyNode(dataNode, insertNewFlow.flowId, manager);
-
-
     return { flowId : insertNewFlow.flowId };
   }
 
@@ -128,13 +127,13 @@ class Flow extends Controller {
   @ReadOnly(false)
   @Log(true)
   async deleteFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
-
     let dataFlow = await __(FlowModel.findOne(params.flowId));
-
 
     if (dataFlow){
       dataFlow.isActive = 0 as number;
       dataFlow.enabled = 'N';
+      dataFlow.modifiedAt = new Date();
+      dataFlow.modifiedBy = this.user.username
       const updFlow = await __(manager.save(dataFlow));
 
       if (updFlow){
@@ -186,17 +185,16 @@ class Flow extends Controller {
   @ReadOnly(false)
   @Log(true)
   async saveFlowName(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
-
-    let dataFlow = await __(FlowModel.findOne(params.flowId));
-    if (dataFlow){
+    let dataFlow = await __(FlowModel.findOne(params.flowId)); 
+    if (dataFlow) {
       dataFlow.name = params.name;
+      dataFlow.modifiedAt = new Date();
+      dataFlow.modifiedBy = this.user.username
       const updFlow = await __(manager.save(dataFlow));
-
       return { success : true };
     }else{
       return { success : false };
     }
-
   }
 
 
@@ -340,8 +338,6 @@ class Flow extends Controller {
            }else{
              taskIds.push('new');
            }
-
-         //}
        }
      }
 
@@ -371,11 +367,8 @@ class Flow extends Controller {
                         WHERE node_id = ${nodesToRemove[0]}`;
               await manager.query(dNode);
             }
-
           }
         }
-
-
      }
 
      if (nodeRefIds.length === 0) {
@@ -410,16 +403,18 @@ class Flow extends Controller {
 
            masterId= id;
            const savedNodes = await manager.save(newConnection);
-           // }
 
          }
 
-       //}
      }
 
-
-
-    return {success:true, nodeId: newId}
+     let dataFlow = await __(FlowModel.findOne(flowId));
+     if (dataFlow) {
+        dataFlow.modifiedAt = new Date();
+        dataFlow.modifiedBy = this.user.username
+        await __(manager.save(dataFlow));
+     }
+     return {success:true, nodeId: newId}
   }
 
 
@@ -615,13 +610,16 @@ class Flow extends Controller {
           nodeIdMaster: null,
           nodeIdChild: id,
         });
+        dataFlow.modifiedAt = new Date();
+        dataFlow.modifiedBy = this.user.username
+        await __(manager.save(dataFlow));
         const savedNodes = await manager.save(newConnection);
         return {success:true, nodeId: id}
-      }else{
+      } else {
         return { success : false, msg: "Action not found or is not event type" };
       }
 
-    }else{
+    } else {
       return { success : false , msg: "Flow not found"};
     }
 
@@ -661,7 +659,7 @@ class Flow extends Controller {
       await manager.remove(dataFlow);
 
       return {success: true};
-    }else{
+    } else {
       return {success: false}
     }
 
@@ -675,6 +673,7 @@ class Flow extends Controller {
   async changeStatusFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
 
     let dataFlow = await __(FlowModel.findOne(params.flowId));
+
     if (dataFlow){
       if (dataFlow.status ==='off' ){
         //change to active
@@ -682,6 +681,10 @@ class Flow extends Controller {
       }else {
          dataFlow.status = 'off';
       }
+
+      dataFlow.modifiedAt = new Date();
+      dataFlow.modifiedBy = this.user.username
+
       const updFlow = await __(manager.save(dataFlow));
       return {success : true}
     }else{

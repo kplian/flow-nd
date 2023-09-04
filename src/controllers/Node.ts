@@ -1,15 +1,14 @@
 /**
- * Effex 2021
- *
- * MIT
- *
- * Member Controller
- *
- * @summary Member Controller
- * @author Favio Figueroa
- *
- * Created at     : 2021-07-08 12:55:38
- * Last modified  :
+ * ******************************************************************************
+ * NAME: Node.ts
+ * DEVELOPER: Favio Figueroa
+ * DESCRIPTION: Flow Controller
+ * REVISIONS:
+ * Date             Change ID     Author Description
+ *  -------------- ----------- -------------- ------------------------------------
+ * 08-Jul-2021                  Favio Figueroa          Created
+ * 04-Sep-2023    SP08SEP23     Rensi Arteaga           add modifiedAt for flows
+ * ******************************************************************************
  */
 
 import {EntityManager, getManager, IsNull, Not} from 'typeorm';
@@ -24,7 +23,7 @@ import _ from 'lodash';
 import FieldMapEntity from "../entity/FieldMap";
 import OriginNameEntity from "../entity/OriginName";
 import axios from 'axios';
-
+import FlowModel from '../entity/Flow';
 
 @Model('flow-nd/Node')
 class Node extends Controller {
@@ -64,6 +63,13 @@ class Node extends Controller {
       }
     }
 
+    let dataFlow = await __(FlowModel.findOne(params.flowId));
+    if (dataFlow) {
+      dataFlow.modifiedAt = new Date();
+      dataFlow.modifiedBy = this.user.username
+      await __(manager.save(dataFlow));
+    }
+
     const { nodeId } = node;
     const nodeData = await manager.findOne(NodeModel, nodeId);
     return nodeData;
@@ -79,15 +85,31 @@ class Node extends Controller {
     Object.entries(params.__metadata).forEach(([nameKey, values]: [nameKey: string, values:any]) => {
       actionConfigJson[nameKey] = `{{ ${values.name} }}`
     });
+
+
+
     const upd = await __(manager.update(NodeModel, params.nodeId, {
       actionConfigJson: JSON.stringify(actionConfigJson),
     }));
+
+
+    let dataNode = await __(NodeModel.findOne(params.nodeId));
+    if(dataNode) {
+      let dataFlow = await __(FlowModel.findOne(dataNode.flowId));
+      if (dataFlow) {
+        dataFlow.modifiedAt = new Date();
+        dataFlow.modifiedBy = this.user.username
+        await __(manager.save(dataFlow));
+      }
+    }
+
     return {
       actionConfigJson,
       success: true,
       nodeId: params.nodeId,
       upd
     }
+
   }
 
   @Post()

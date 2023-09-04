@@ -701,6 +701,7 @@ class Flow extends Controller {
     const isActive = params._isActive;
     const type = params._type;
     const vendorId = params._vendorId;
+    const allowedColumns = ['name','description'];
     const queryBuilder:any = await getManager()
         .createQueryBuilder()
           .select([
@@ -736,9 +737,12 @@ class Flow extends Controller {
       if (vendorId) {
         queryBuilder.andWhere('f.vendor_id = :vendorId', { vendorId });
       }
+      if (allowedColumns.includes(params.genericFilterFields)) {
+         if (params.genericFilterFields && params.genericFilterValue) {
+           queryBuilder.andWhere(`f.${params.genericFilterFields} LIKE :genericFilterValue`, { genericFilterValue: `%${params.genericFilterValue}%`});
+         }
+      }
 
-      // Sorting and pagination
-      queryBuilder.orderBy(`f.${params.sort}`, params.dir).skip(params.start).take(params.limit);
 
       queryBuilder.groupBy([
         'f.flow_id',
@@ -759,29 +763,48 @@ class Flow extends Controller {
         'f.status',
       ]);
 
-       const data = await  queryBuilder.getRawMany();
+      // Sorting and pagination
+      //queryBuilder.orderBy(`f.${params.sort}`, params.dir).skip(params.start).take(params.limit);
+
+    // Sorting and pagination
+    queryBuilder.orderBy(`f.${params.sort}`, params.dir);
+
+    // Agrega manualmente la cláusula LIMIT y OFFSET
+    queryBuilder.limit(params.limit).offset(params.start);
 
 
-       // Construct the count query
-       const countQuery =  await getManager()
-                 .createQueryBuilder()
-                 .select('COUNT(f.flow_id)', 'count')
-                 .from('twf_flow', 'f');
+     const data = await  queryBuilder.getRawMany();
 
-       // Optional filters for the count query
-       if (isActive !== undefined) {
-        countQuery.where('f.is_active = :isActive', { isActive });
-       }
-       if (type) {
-        countQuery.andWhere('f.type = :type', { type });
-       }
-       if (vendorId) {
-         countQuery.andWhere('f.vendor_id = :vendorId', { vendorId });
-       }
+
+
+     // Construct the count query
+     const countQuery =  await getManager()
+               .createQueryBuilder()
+               .select('COUNT(f.flow_id)', 'count')
+               .from('twf_flow', 'f');
+
+     // Optional filters for the count query
+     if (isActive !== undefined) {
+      countQuery.where('f.is_active = :isActive', { isActive });
+     }
+     if (type) {
+      countQuery.andWhere('f.type = :type', { type });
+     }
+     if (vendorId) {
+       countQuery.andWhere('f.vendor_id = :vendorId', { vendorId });
+     }
+
+    if (allowedColumns.includes(params.genericFilterFields)) {
+      if (params.genericFilterFields && params.genericFilterValue) {
+        countQuery.andWhere(`f.${params.genericFilterFields} LIKE :genericFilterValue`, { genericFilterValue: `%${params.genericFilterValue}%`});
+      }
+    }
+
+
 
        const totalCount = await countQuery.getRawOne();
-       const total = totalCount.count;
-       return {data, total}
+       const count = totalCount.count;
+       return {data, count}
 
     }
 

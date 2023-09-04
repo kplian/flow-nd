@@ -519,6 +519,7 @@ let Flow = class Flow extends core_1.Controller {
         const isActive = params._isActive;
         const type = params._type;
         const vendorId = params._vendorId;
+        const allowedColumns = ['name', 'description'];
         const queryBuilder = await (0, typeorm_1.getManager)()
             .createQueryBuilder()
             .select([
@@ -552,8 +553,11 @@ let Flow = class Flow extends core_1.Controller {
         if (vendorId) {
             queryBuilder.andWhere('f.vendor_id = :vendorId', { vendorId });
         }
-        // Sorting and pagination
-        queryBuilder.orderBy(`f.${params.sort}`, params.dir).skip(params.start).take(params.limit);
+        if (allowedColumns.includes(params.genericFilterFields)) {
+            if (params.genericFilterFields && params.genericFilterValue) {
+                queryBuilder.andWhere(`f.${params.genericFilterFields} LIKE :genericFilterValue`, { genericFilterValue: `%${params.genericFilterValue}%` });
+            }
+        }
         queryBuilder.groupBy([
             'f.flow_id',
             'f.vendor_id',
@@ -572,6 +576,12 @@ let Flow = class Flow extends core_1.Controller {
             'f.icon',
             'f.status',
         ]);
+        // Sorting and pagination
+        //queryBuilder.orderBy(`f.${params.sort}`, params.dir).skip(params.start).take(params.limit);
+        // Sorting and pagination
+        queryBuilder.orderBy(`f.${params.sort}`, params.dir);
+        // Agrega manualmente la cláusula LIMIT y OFFSET
+        queryBuilder.limit(params.limit).offset(params.start);
         const data = await queryBuilder.getRawMany();
         // Construct the count query
         const countQuery = await (0, typeorm_1.getManager)()
@@ -588,9 +598,14 @@ let Flow = class Flow extends core_1.Controller {
         if (vendorId) {
             countQuery.andWhere('f.vendor_id = :vendorId', { vendorId });
         }
+        if (allowedColumns.includes(params.genericFilterFields)) {
+            if (params.genericFilterFields && params.genericFilterValue) {
+                countQuery.andWhere(`f.${params.genericFilterFields} LIKE :genericFilterValue`, { genericFilterValue: `%${params.genericFilterValue}%` });
+            }
+        }
         const totalCount = await countQuery.getRawOne();
-        const total = totalCount.count;
-        return { data, total };
+        const count = totalCount.count;
+        return { data, count };
     }
 };
 __decorate([

@@ -73,12 +73,20 @@ let Flow = class Flow extends core_1.Controller {
             const insertNewNodeConnection = await (0, core_1.__)(manager.save(NodeConnection_1.default, newNodeConnection));
         }
     }
-    async copyNode(node, newFlowId, manager) {
+    async copyNode(node, newFlowId, manager, isFirst = false) {
         // insert new node
         const newNode = new Node_1.default();
-        const { nodeId, flowId, createdAt, modifiedAt, actionConfigJson, ...nodeToCopy } = node;
+        const { nodeId, flowId, createdAt, modifiedAt, ...nodeToCopy } = node;
         Object.assign(newNode, { ...nodeToCopy, flowId: newFlowId });
         const insertNewNode = await (0, core_1.__)(manager.save(Node_1.default, newNode));
+        if (isFirst) {
+            const duplicatedConnection = manager.create(NodeConnection_1.default, {
+                nodeConnectionId: undefined,
+                nodeIdMaster: undefined,
+                nodeIdChild: insertNewNode.nodeId,
+            });
+            await manager.save(duplicatedConnection);
+        }
         // insert connection
         await this.copyNodeConnections(node.nodeId, insertNewNode.nodeId, newFlowId, manager);
         return { nodeId: insertNewNode.nodeId };
@@ -160,7 +168,8 @@ let Flow = class Flow extends core_1.Controller {
                 ...flowData,
                 flowId: undefined,
                 nodes: [],
-                createdAt: undefined,
+                createdAt: new Date(),
+                modifiedAt: new Date(),
                 status: 'off'
             };
             let flowDataClone;
@@ -172,7 +181,7 @@ let Flow = class Flow extends core_1.Controller {
                 flowDataClone = await manager.save(Flow_1.default, { ...flowToClone, name: `${flowData.name} Copy` });
             }
             const dataNode = await Node_1.default.findOne({ where: { flowId: params.flowId, isInit: 'Y', isActive: true }, order: { nodeId: "ASC" } });
-            dataNode && await this.copyNode(dataNode, flowDataClone.flowId, manager);
+            dataNode && await this.copyNode(dataNode, flowDataClone.flowId, manager, true);
             return { success: true, flowId: flowDataClone.flowId };
         }
         else {

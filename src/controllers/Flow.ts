@@ -79,13 +79,21 @@ class Flow extends Controller {
 
     }
   }
-  async copyNode(node: Record<any, any>, newFlowId: number, manager: EntityManager) {
+  async copyNode(node: Record<any, any>, newFlowId: number, manager: EntityManager, isFirst: boolean = false) {
 
     // insert new node
     const newNode = new NodeModel();
-    const { nodeId, flowId, createdAt, modifiedAt, actionConfigJson, ...nodeToCopy } = node;
+    const { nodeId, flowId, createdAt, modifiedAt, ...nodeToCopy } = node;
     Object.assign(newNode, { ...nodeToCopy, flowId: newFlowId });
     const insertNewNode = await __(manager.save(NodeModel, newNode));
+    if (isFirst) {
+      const duplicatedConnection = manager.create(NodeConnectionModel, {
+        nodeConnectionId : undefined,
+        nodeIdMaster: undefined,
+        nodeIdChild: insertNewNode.nodeId,
+      });
+      await manager.save(duplicatedConnection);
+    }
     // insert connection
     await this.copyNodeConnections(node.nodeId, insertNewNode.nodeId, newFlowId, manager);
 
@@ -212,7 +220,8 @@ class Flow extends Controller {
         ...flowData,
         flowId: undefined as any,
         nodes: [] as any[],
-        createdAt: undefined as any,
+        createdAt: new Date(),
+        modifiedAt: new Date(),
         status: 'off'
       }
 
@@ -226,7 +235,7 @@ class Flow extends Controller {
       }
 
       const dataNode = await NodeModel.findOne({ where: {flowId: params.flowId, isInit: 'Y', isActive: true }, order: {nodeId: "ASC"}});
-      dataNode && await this.copyNode(dataNode, flowDataClone.flowId, manager);
+      dataNode && await this.copyNode(dataNode, flowDataClone.flowId, manager, true);
       return { success:true, flowId: flowDataClone.flowId }
     }else{
       return { success:false, "respuesta": "No Flow" }

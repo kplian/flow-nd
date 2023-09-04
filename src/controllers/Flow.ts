@@ -226,7 +226,7 @@ class Flow extends Controller {
       }
 
 
-      const nodesToDuplicate = await manager.find(NodeModel, { flowId: flowData?.flowId ,isActive:true});
+      const nodesToDuplicate = await manager.find(NodeModel, { flowId: flowData?.flowId, isActive:true});
 
       if (nodesToDuplicate) {
         const originalNodeIds = nodesToDuplicate.map((node) => node.nodeId);
@@ -241,7 +241,7 @@ class Flow extends Controller {
 
 
         const connectionsToDuplicate = await manager.find(NodeConnectionModel, {
-          where: { nodeIdChild: In(originalNodeIds) }
+          where: { nodeIdChild: In(originalNodeIds), isActive:true}
         });
 
 

@@ -182,7 +182,7 @@ let Flow = class Flow extends core_1.Controller {
                 const savedNodes = await manager.save(duplicatedNodes);
                 const newNodeIds = savedNodes.map((node) => node.nodeId);
                 const connectionsToDuplicate = await manager.find(NodeConnection_1.default, {
-                    where: { nodeIdChild: (0, typeorm_1.In)(originalNodeIds) }
+                    where: { nodeIdChild: (0, typeorm_1.In)(originalNodeIds), isActive: true }
                 });
                 const duplicatedConnections = newNodeIds.map((nodeId, index) => {
                     const duplicatedConnection = manager.create(NodeConnection_1.default, {

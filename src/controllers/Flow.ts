@@ -22,8 +22,9 @@ import { EntityManager, getManager, In } from 'typeorm';
 
 import {
   Controller,
-  Model, __, Log, Post, DbSettings, ReadOnly, Get
+  Model, __, Log, Post, DbSettings, ReadOnly, Get, PxpError
 } from '@pxp-nd/core';
+import * as _ from 'lodash';
 import NodeModel from '../entity/Node';
 import ActionModel from '../entity/Action';
 import NodeConnectionModel from '../entity/NodeConnection';
@@ -654,6 +655,7 @@ class Flow extends Controller {
 
     if (dataFlow){
       if (dataFlow.status ==='off' ){
+        await this.validateFlow(params.flowId as number, manager);
         //change to active
          dataFlow.status = 'on';
       }else {
@@ -668,6 +670,52 @@ class Flow extends Controller {
     }else{
       return { success : false }
     }
+
+  }
+
+  async validateFlow(flowId: number, manager: EntityManager): Promise<unknown> {
+
+    const nodes = await NodeModel.find({ flowId, isActive: true });
+        let res = '';
+    
+        for (const node of nodes) {
+            const configActionType = !node.action.actionType.schemaJson ? {} :  JSON.parse(node.action.actionType.schemaJson);
+            
+            const configAction = !node.action.schemaJson ? {} : JSON.parse(node.action.schemaJson);
+            const config = _.merge({}, configActionType, configAction);
+            const required: string[] = [];
+            for (const key in config) {
+                if (config.hasOwnProperty(key)) {
+                  const prop = config[key];
+                  
+                  if (prop && typeof prop === "object" && 
+                    ((prop.validate && prop.validate.shape.includes('required')) || 
+                    (prop.formComponent && prop.formComponent.validate && prop.formComponent.validate.shape.includes('required')))) {
+                    required.push(key);
+                  }
+                }
+            }
+            
+            const valueNode = !node.actionConfigJson ? {} : JSON.parse(node.actionConfigJson);
+            const valueAction = !node.action.configJsonTemplate ? {} : JSON.parse(node.action.configJsonTemplate);
+            const values = _.merge({}, valueAction, valueNode);
+            
+            const missingRequired: string[] = [];
+            required.forEach((property) => {
+                if (!values.hasOwnProperty(property)) {
+                    missingRequired.push(property);
+                }
+            });
+            
+            if (missingRequired.length > 0) {
+                res += `In node ${node.action.name} ${node.nodeId} you have missing fields: ${missingRequired.join(',')}, `
+            }
+        }
+        if (res != '') {
+            res = res.slice(0, -2);
+            throw new PxpError(400, 'Please resolve these issues before starting the flow: ' + res);
+        }
+        return true;
 
   }
 

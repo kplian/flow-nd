@@ -531,6 +531,9 @@ let Flow = class Flow extends core_1.Controller {
     async validateFlow(flowId, manager) {
         const nodes = await Node_1.default.find({ flowId, isActive: true });
         let res = '';
+        if (nodes.length < 2) {
+            throw new core_1.PxpError(400, 'Your flow must have at least 2 steps. Please finish configuring it before start');
+        }
         for (const node of nodes) {
             const configActionType = !node.action.actionType.schemaJson ? {} : JSON.parse(node.action.actionType.schemaJson);
             const configAction = !node.action.schemaJson ? {} : JSON.parse(node.action.schemaJson);
@@ -556,7 +559,7 @@ let Flow = class Flow extends core_1.Controller {
                 }
             });
             if (missingRequired.length > 0) {
-                res += `In node ${node.action.name} ${node.nodeId} you have missing fields: ${missingRequired.join(',')}, `;
+                res += `In node ${node.action.name} you have missing fields: ${missingRequired.join(', ')}, `;
             }
         }
         if (res != '') {

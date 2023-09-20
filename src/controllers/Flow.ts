@@ -15,6 +15,7 @@
  * 17-Aug-2023    SP25AUG23     Mercedes Zambrana      Add insertEventFlow
  * 18-Aug-2023    SP25AUG23     Mercedes Zambrana      Add removeFlow
  * 01-Sep-2023    SP08SEP23     Rensi Arteaga          add base flow list
+ * 16-Sep-2023    SP22SEP23     Mercedes Zambrana       Change GET to POST in insertEventFlow
  * ******************************************************************************
  */
 
@@ -398,6 +399,7 @@ class Flow extends Controller {
 
 
   @Get()
+  @Post()
   @DbSettings('Orm')
   @ReadOnly(true)
   @Log(true)
@@ -575,7 +577,7 @@ class Flow extends Controller {
           .getMany();
 
       if (action){
-        const newNode = manager.create(NodeModel, {
+         const newNode = manager.create(NodeModel, {
           nodeId : undefined,
           flowId: params.flowId,
           isInit: 'Y',

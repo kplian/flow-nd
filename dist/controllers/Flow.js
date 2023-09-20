@@ -16,6 +16,7 @@
  * 17-Aug-2023    SP25AUG23     Mercedes Zambrana      Add insertEventFlow
  * 18-Aug-2023    SP25AUG23     Mercedes Zambrana      Add removeFlow
  * 01-Sep-2023    SP08SEP23     Rensi Arteaga          add base flow list
+ * 16-Sep-2023    SP22SEP23     Mercedes Zambrana       Change GET to POST in insertEventFlow
  * ******************************************************************************
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -717,6 +718,7 @@ __decorate([
 ], Flow.prototype, "saveFlow", null);
 __decorate([
     (0, core_1.Get)(),
+    (0, core_1.Post)(),
     (0, core_1.DbSettings)('Orm'),
     (0, core_1.ReadOnly)(true),
     (0, core_1.Log)(true),

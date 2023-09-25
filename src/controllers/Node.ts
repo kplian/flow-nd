@@ -194,15 +194,15 @@ class Node extends Controller {
     // this logic is for autocomplete for moment
     const findFieldInConfigForComponent = async (json: Record<any, any>, value: any) => {
       if (json.formComponent && json.formComponent.type === 'AutoComplete') {
-        const url: string = json.formComponent.store.axios.url as string;
-        const method: string = json.formComponent.store.axios.method as string;
-        const data = json.formComponent.store.axios.data;
+        const url: string = json.formComponent.store.axios.config.url as string;
+        const method: string = json.formComponent.store.axios.config.method as string;
+        const data = json.formComponent.store.axios.config.data;
         const idDD = json.formComponent.store.idDD;
         const descDD = json.formComponent.store.descDD;
 
         const config = {
           method: method,
-          url: url,
+          url: `http://localhost:${process.env.PORT}${url}`,
           headers: {
             'Authorization': '' + process.env.TOKEN_PXP_ND + '',
             'Content-Type': 'application/json'

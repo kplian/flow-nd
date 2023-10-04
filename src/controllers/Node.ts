@@ -8,6 +8,7 @@
  *  -------------- ----------- -------------- ------------------------------------
  * 08-Jul-2021                  Favio Figueroa          Created
  * 04-Sep-2023    SP08SEP23     Rensi Arteaga           add modifiedAt for flows
+ * 29-Sep-2023    SP06OCT23     Mercedes Zambrana       Add validation when flow is on
  * ******************************************************************************
  */
 
@@ -16,7 +17,7 @@ import NodeModel from '../entity/Node';
 import NodeConnectionModel from '../entity/NodeConnection';
 import {
   Controller,
-  Model, __, Log, Post, DbSettings, ReadOnly, Get
+  Model, __, Log, Post, DbSettings, ReadOnly, Get, PxpError
 } from '@pxp-nd/core';
 import NodeInstanceModel from "../entity/NodeInstance";
 import _ from 'lodash';
@@ -85,30 +86,40 @@ class Node extends Controller {
     Object.entries(params.__metadata).forEach(([nameKey, values]: [nameKey: string, values:any]) => {
       actionConfigJson[nameKey] = `{{ ${values.name} }}`
     });
-
-
-
-    const upd = await __(manager.update(NodeModel, params.nodeId, {
-      actionConfigJson: JSON.stringify(actionConfigJson),
-    }));
-
-
+    let allowChange=false;
     let dataNode = await __(NodeModel.findOne(params.nodeId));
     if(dataNode) {
       let dataFlow = await __(FlowModel.findOne(dataNode.flowId));
       if (dataFlow) {
-        dataFlow.modifiedAt = new Date();
-        dataFlow.modifiedBy = this.user.username
-        await __(manager.save(dataFlow));
+        if (dataFlow.status != 'on') {
+          allowChange = true;
+
+          dataFlow.modifiedAt = new Date();
+          dataFlow.modifiedBy = this.user.username
+          await __(manager.save(dataFlow));
+        }
+
+
       }
     }
+      if (allowChange) {
+        const upd = await __(manager.update(NodeModel, params.nodeId, {
+          actionConfigJson: JSON.stringify(actionConfigJson),
+        }));
 
-    return {
-      actionConfigJson,
-      success: true,
-      nodeId: params.nodeId,
-      upd
-    }
+        return {
+          actionConfigJson,
+          success: true,
+          nodeId: params.nodeId,
+          upd,
+          msg: `Changes have been saved successfully.`
+        }
+      }else{
+       throw new PxpError(400, 'Please turn off the flow before make a change');
+      }
+
+
+
 
   }
 
@@ -117,7 +128,7 @@ class Node extends Controller {
   @ReadOnly(false)
   @Log(true)
   async getParameterizedNode(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
-    console.log('getParameterizedNode llega');
+    
     _.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
 
     const { nodeId, flowId, substitutionsSchemaJson = {} } = params;
@@ -148,11 +159,7 @@ class Node extends Controller {
     ]);*/
 
     const {actionConfigJson, action: { schemaJson, configJsonTemplate , actionType: { schemaJson: schemaJsonFromActionType }}} = nodeData;
-    console.log('nodeData actionConfigJson',actionConfigJson)
-    console.log('action schemaJson',schemaJson)
-    console.log('action configJsonTemplate',configJsonTemplate)
-    console.log('actionType schemaJsonFromActionType',schemaJsonFromActionType)
-    console.log('actionType fieldMapData',fieldMapData)
+    
 
     const actionConfigJsonObject = actionConfigJson ? JSON.parse(actionConfigJson) : {};
     const configJsonTemplateObject = configJsonTemplate ? JSON.parse(configJsonTemplate) : {};
@@ -240,7 +247,7 @@ class Node extends Controller {
       }
       return undefined;
     }
-    console.log('mergeValues',mergeValues)
+    
     for (const [nameKey, value] of Object.entries(mergeValues)) {
       if(schemaJsonObject[nameKey]) {
         const descValue = await __(findFieldInConfigForComponent(schemaJsonObject[nameKey], value));
@@ -252,7 +259,7 @@ class Node extends Controller {
         }
       }
     }
-    console.log('111 schemaJsonObject',schemaJsonObject)
+    //console.log('111 schemaJsonObject',schemaJsonObject)
 
     /*Object.entries(schemaJsonObject)
         .filter(([, value]: [nameKey: string, value: any]) => value.initialValue === undefined && value.fromFieldMap === undefined && value.fieldMappingType)
@@ -263,7 +270,7 @@ class Node extends Controller {
             ...(hasUniqueByTypeInMappingData && { fromFieldMap: true, ...hasUniqueByTypeInMappingData }),
           };
         })*/
-    console.log('222 schemaJsonObject',schemaJsonObject)
+//    console.log('222 schemaJsonObject',schemaJsonObject)
 
 
     return {

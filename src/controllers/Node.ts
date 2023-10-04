@@ -1,15 +1,15 @@
 /**
- * Effex 2021
- *
- * MIT
- *
- * Member Controller
- *
- * @summary Member Controller
- * @author Favio Figueroa
- *
- * Created at     : 2021-07-08 12:55:38
- * Last modified  :
+ * ******************************************************************************
+ * NAME: Node.ts
+ * DEVELOPER: Favio Figueroa
+ * DESCRIPTION: Flow Controller
+ * REVISIONS:
+ * Date             Change ID     Author Description
+ *  -------------- ----------- -------------- ------------------------------------
+ * 08-Jul-2021                  Favio Figueroa          Created
+ * 04-Sep-2023    SP08SEP23     Rensi Arteaga           add modifiedAt for flows
+ * 29-Sep-2023    SP06OCT23     Mercedes Zambrana       Add validation when flow is on
+ * ******************************************************************************
  */
 
 import {EntityManager, getManager, IsNull, Not} from 'typeorm';
@@ -17,14 +17,14 @@ import NodeModel from '../entity/Node';
 import NodeConnectionModel from '../entity/NodeConnection';
 import {
   Controller,
-  Model, __, Log, Post, DbSettings, ReadOnly, Get
+  Model, __, Log, Post, DbSettings, ReadOnly, Get, PxpError
 } from '@pxp-nd/core';
 import NodeInstanceModel from "../entity/NodeInstance";
 import _ from 'lodash';
 import FieldMapEntity from "../entity/FieldMap";
 import OriginNameEntity from "../entity/OriginName";
 import axios from 'axios';
-
+import FlowModel from '../entity/Flow';
 
 @Model('flow-nd/Node')
 class Node extends Controller {
@@ -64,6 +64,13 @@ class Node extends Controller {
       }
     }
 
+    let dataFlow = await __(FlowModel.findOne(params.flowId));
+    if (dataFlow) {
+      dataFlow.modifiedAt = new Date();
+      dataFlow.modifiedBy = this.user.username
+      await __(manager.save(dataFlow));
+    }
+
     const { nodeId } = node;
     const nodeData = await manager.findOne(NodeModel, nodeId);
     return nodeData;
@@ -79,15 +86,41 @@ class Node extends Controller {
     Object.entries(params.__metadata).forEach(([nameKey, values]: [nameKey: string, values:any]) => {
       actionConfigJson[nameKey] = `{{ ${values.name} }}`
     });
-    const upd = await __(manager.update(NodeModel, params.nodeId, {
-      actionConfigJson: JSON.stringify(actionConfigJson),
-    }));
-    return {
-      actionConfigJson,
-      success: true,
-      nodeId: params.nodeId,
-      upd
+    let allowChange=false;
+    let dataNode = await __(NodeModel.findOne(params.nodeId));
+    if(dataNode) {
+      let dataFlow = await __(FlowModel.findOne(dataNode.flowId));
+      if (dataFlow) {
+        if (dataFlow.status != 'on') {
+          allowChange = true;
+
+          dataFlow.modifiedAt = new Date();
+          dataFlow.modifiedBy = this.user.username
+          await __(manager.save(dataFlow));
+        }
+
+
+      }
     }
+      if (allowChange) {
+        const upd = await __(manager.update(NodeModel, params.nodeId, {
+          actionConfigJson: JSON.stringify(actionConfigJson),
+        }));
+
+        return {
+          actionConfigJson,
+          success: true,
+          nodeId: params.nodeId,
+          upd,
+          msg: `Changes have been saved successfully.`
+        }
+      }else{
+       throw new PxpError(400, 'Please turn off the flow before make a change');
+      }
+
+
+
+
   }
 
   @Post()
@@ -95,27 +128,30 @@ class Node extends Controller {
   @ReadOnly(false)
   @Log(true)
   async getParameterizedNode(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+    
     _.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
 
     const { nodeId, flowId, substitutionsSchemaJson = {} } = params;
+    const tNodeData =  __(NodeModel.findOne(nodeId));
+    const nodeData = await tNodeData;
+
     const tNodeOrigin =  await __(NodeModel.findOne({
       relations: ['action'],
       where: {
-        flowId: flowId,
+        flowId: nodeData.flowId,
         isInit: 'Y',
         action: {
           originName: Not(IsNull())
         }
       }
     }));
-    const tNodeData =  __(NodeModel.findOne(nodeId));
     const tFieldMapData =  __(manager.createQueryBuilder(FieldMapEntity, 'fm')
         .innerJoin(OriginNameEntity, 'on', 'on.originNameId = fm.originNameId')
         .where("on.name = :n ", {n: tNodeOrigin.action.originName})
         .getMany());
 
     //const nodeOrigin = await tNodeOrigin; todo
-    const nodeData = await tNodeData;
+    
     const fieldMapData = await tFieldMapData;
     /*const [nodeData, fieldMapData] = await Promise.all([
       tNodeData,
@@ -123,6 +159,7 @@ class Node extends Controller {
     ]);*/
 
     const {actionConfigJson, action: { schemaJson, configJsonTemplate , actionType: { schemaJson: schemaJsonFromActionType }}} = nodeData;
+    
 
     const actionConfigJsonObject = actionConfigJson ? JSON.parse(actionConfigJson) : {};
     const configJsonTemplateObject = configJsonTemplate ? JSON.parse(configJsonTemplate) : {};
@@ -164,15 +201,15 @@ class Node extends Controller {
     // this logic is for autocomplete for moment
     const findFieldInConfigForComponent = async (json: Record<any, any>, value: any) => {
       if (json.formComponent && json.formComponent.type === 'AutoComplete') {
-        const url: string = json.formComponent.store.axios.url as string;
-        const method: string = json.formComponent.store.axios.method as string;
-        const data = json.formComponent.store.axios.data;
+        const url: string = json.formComponent.store.axios.config.url as string;
+        const method: string = json.formComponent.store.axios.config.method as string;
+        const data = json.formComponent.store.axios.config.data;
         const idDD = json.formComponent.store.idDD;
         const descDD = json.formComponent.store.descDD;
 
         const config = {
           method: method,
-          url: url,
+          url: `http://localhost:${process.env.PORT}${url}`,
           headers: {
             'Authorization': '' + process.env.TOKEN_PXP_ND + '',
             'Content-Type': 'application/json'
@@ -210,6 +247,7 @@ class Node extends Controller {
       }
       return undefined;
     }
+    
     for (const [nameKey, value] of Object.entries(mergeValues)) {
       if(schemaJsonObject[nameKey]) {
         const descValue = await __(findFieldInConfigForComponent(schemaJsonObject[nameKey], value));
@@ -221,8 +259,9 @@ class Node extends Controller {
         }
       }
     }
+    //console.log('111 schemaJsonObject',schemaJsonObject)
 
-    Object.entries(schemaJsonObject)
+    /*Object.entries(schemaJsonObject)
         .filter(([, value]: [nameKey: string, value: any]) => value.initialValue === undefined && value.fromFieldMap === undefined && value.fieldMappingType)
         .forEach(([nameKey]) => {
           const hasUniqueByTypeInMappingData = findFieldMapUniqueByType(schemaJsonObject[nameKey].fieldMappingType);
@@ -230,7 +269,9 @@ class Node extends Controller {
             ...schemaJsonObject[nameKey],
             ...(hasUniqueByTypeInMappingData && { fromFieldMap: true, ...hasUniqueByTypeInMappingData }),
           };
-        })
+        })*/
+//    console.log('222 schemaJsonObject',schemaJsonObject)
+
 
     return {
       actionConfigJsonObject,

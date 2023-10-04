@@ -60,4 +60,7 @@ export default class Action extends PxpEntity{
 
   @OneToMany( () => Node, eventNode => eventNode.actionEvent)
   eventNodes: Node[];
+
+  @Column({ type: 'varchar',   length: 200 })
+  icon: string;
 }

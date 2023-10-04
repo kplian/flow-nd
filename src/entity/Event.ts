@@ -25,6 +25,9 @@ export default class Event extends PxpEntity{
   @Column({ name: 'data_id', type: 'int', nullable: false })
   dataId: number;
 
+  @Column({ name: 'status', type: 'varchar',  length: 30, nullable: false, default: 'pending' })
+  status: string;
+
   @ManyToOne(() => Action, action => action.nodes)
   @JoinColumn({ name: 'action_id' })
   action: Action;

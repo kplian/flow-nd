@@ -396,7 +396,7 @@ class Flow extends Controller {
               }
             }
           }else{
-            throw new PxpError(400, 'AAA: Please turn off the flow before make a change');
+            throw new PxpError(400, 'Please turn off the flow before make a change');
           }
 
 

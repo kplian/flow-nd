@@ -222,7 +222,9 @@ class Node extends Controller {
 
         // @ts-ignore
         const resControllerAxios = await __(axios(config));
+        console.log('resControllerAxios',resControllerAxios)
         const desc = resControllerAxios.data.data[descDD];
+
         return desc;
 
       } else if(json.formComponentTemplate && json.configGetDescValue) { // todo we need to see how works here
@@ -250,7 +252,10 @@ class Node extends Controller {
     
     for (const [nameKey, value] of Object.entries(mergeValues)) {
       if(schemaJsonObject[nameKey]) {
-        const descValue = await __(findFieldInConfigForComponent(schemaJsonObject[nameKey], value));
+        let descValue;
+        if(value) {
+          descValue = await __(findFieldInConfigForComponent(schemaJsonObject[nameKey], value));
+        }
         schemaJsonObject[nameKey] = {
           ...schemaJsonObject[nameKey],
           initialValue: value,

@@ -488,7 +488,7 @@ class Flow extends Controller {
     let cond = " and 0=0";
 
     if (!totalNodes){
-      cond =  " and (at.name in ( 'EVENT','PAGE')) ";
+      cond =  " and (at.name in ( 'EVENT')) ";
     }else{
       const oName= totalNodes?.action?.originName;
       const condPage = " and a.actionId = "+totalNodes?.action?.actionId;
@@ -502,7 +502,7 @@ class Flow extends Controller {
 
 
        if (actionTypePage[0].name == 'PAGE'){
-         cond = `and at.name = 'PAGE' `;
+         cond = `and a.code = 'BRIDGE' and at.name='PAGE'`;
        }else{
          cond = `and (at.name not in ('EVENT','PAGE')) and (a.originName is null or a.originName = '${oName}') `;
        }

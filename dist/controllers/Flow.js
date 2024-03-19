@@ -382,7 +382,7 @@ let Flow = class Flow extends core_1.Controller {
             .getOne();
         let cond = " and 0=0";
         if (!totalNodes) {
-            cond = " and (at.name in ( 'EVENT','PAGE')) ";
+            cond = " and (at.name in ( 'EVENT')) ";
         }
         else {
             const oName = (_a = totalNodes === null || totalNodes === void 0 ? void 0 : totalNodes.action) === null || _a === void 0 ? void 0 : _a.originName;
@@ -394,7 +394,7 @@ let Flow = class Flow extends core_1.Controller {
               where a.action_id = ${(_c = totalNodes === null || totalNodes === void 0 ? void 0 : totalNodes.action) === null || _c === void 0 ? void 0 : _c.actionId}
             `);
             if (actionTypePage[0].name == 'PAGE') {
-                cond = `and at.name = 'PAGE' `;
+                cond = `and a.code = 'BRIDGE' and at.name='PAGE'`;
             }
             else {
                 cond = `and (at.name not in ('EVENT','PAGE')) and (a.originName is null or a.originName = '${oName}') `;

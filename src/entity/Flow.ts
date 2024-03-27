@@ -9,6 +9,7 @@
  * Date Change      ID              Author              Description
  * -----------      -----------     --------------      ------------------------------------
  * 04-Sep-2023      SP08SEP23       Rensi Arteaga       add modified at and by
+ * 19-Feb-2024		SP01MAR24		Mercedes Zambrana	add template_type
  *****************************************************************************/
 import {
 	OneToMany,
@@ -64,5 +65,8 @@ export default class Flow extends PxpEntity{
 
 	@Column({ name: 'modified_by', type: 'varchar', length: 500 })
 	modifiedBy: string;
+
+	@Column({name: 'template_type', type: 'varchar', nullable: false, length: 15 })
+	templateType: string;
 
 }

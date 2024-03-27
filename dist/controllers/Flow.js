@@ -18,6 +18,7 @@
  * 01-Sep-2023    SP08SEP23     Rensi Arteaga          add base flow list
  * 16-Sep-2023    SP22SEP23     Mercedes Zambrana       Change GET to POST in insertEventFlow
  * 28-Sep-2023    SP06OCT23     Mercedes Zambrana      Add Validation when change off status (validateFlow, deleteflow, saveFlow, saveflowName)
+ * 20-Feb-2024    SP01MAR24     Mercedes Zambrana      Add in getFlowRender, insertEventFlow condition for at.name=PAGE
  * ******************************************************************************
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -106,6 +107,7 @@ let Flow = class Flow extends core_1.Controller {
         // insert new node
         const newNode = new Node_1.default();
         const { nodeId, flowId, createdAt, modifiedAt, ...nodeToCopy } = node;
+        //for each node, get schema_json from action_type. So, if has templateId check in configGetDescValue the parameter storeId
         Object.assign(newNode, { ...nodeToCopy, flowId: newFlowId });
         const insertNewNode = await (0, core_1.__)(manager.save(Node_1.default, newNode));
         if (isFirst) {
@@ -366,25 +368,37 @@ let Flow = class Flow extends core_1.Controller {
         return { success: true, nodeId: newId };
     }
     async getFlowRender(params) {
-        var _a;
+        var _a, _b, _c;
         const flow = await (0, typeorm_1.getManager)().findOne(Flow_1.default, params.flowId);
         const totalNodes = await (0, typeorm_1.getManager)()
             .createQueryBuilder(Node_1.default, "n")
             .select([
             "n.nodeId",
-            "a.originName"
+            "a.originName",
+            "a.actionId"
         ])
             .innerJoin("n.action", "a")
             .where(`n.isActive = 1 and n.flowId = :flowId`, { flowId: params.flowId })
             .getOne();
         let cond = " and 0=0";
         if (!totalNodes) {
-            cond = " and at.name= 'EVENT' ";
+            cond = " and (at.name in ( 'EVENT')) ";
         }
         else {
             const oName = (_a = totalNodes === null || totalNodes === void 0 ? void 0 : totalNodes.action) === null || _a === void 0 ? void 0 : _a.originName;
-            //
-            cond = `and at.name != 'EVENT' and (a.originName is null or a.originName = '${oName}')`;
+            const condPage = " and a.actionId = " + ((_b = totalNodes === null || totalNodes === void 0 ? void 0 : totalNodes.action) === null || _b === void 0 ? void 0 : _b.actionId);
+            const actionTypePage = await (0, typeorm_1.getManager)().query(`
+                select at.name
+              from twf_action a
+              inner join twf_action_type at on at.action_type_id = a.action_type_id
+              where a.action_id = ${(_c = totalNodes === null || totalNodes === void 0 ? void 0 : totalNodes.action) === null || _c === void 0 ? void 0 : _c.actionId}
+            `);
+            if (actionTypePage[0].name == 'PAGE') {
+                cond = `and a.code = 'BRIDGE' and at.name='PAGE'`;
+            }
+            else {
+                cond = `and (at.name not in ('EVENT','PAGE')) and (a.originName is null or a.originName = '${oName}') `;
+            }
         }
         let actions = await (0, typeorm_1.getManager)()
             .createQueryBuilder(Action_1.default, "a")
@@ -500,7 +514,7 @@ let Flow = class Flow extends core_1.Controller {
                 "a.actionId"
             ])
                 .innerJoin("a.actionType", "at")
-                .where(`a.isActive = 1 and a.hidden = 'N' and at.name = 'EVENT' and at.isActive = 1 `, { actionId: params.actionId })
+                .where(`a.isActive = 1 and a.hidden = 'N' and at.name in ('EVENT','PAGE') and at.isActive = 1 `, { actionId: params.actionId })
                 .getMany();
             if (action) {
                 const newNode = manager.create(Node_1.default, {

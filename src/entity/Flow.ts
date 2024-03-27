@@ -9,7 +9,6 @@
  * Date Change      ID              Author              Description
  * -----------      -----------     --------------      ------------------------------------
  * 04-Sep-2023      SP08SEP23       Rensi Arteaga       add modified at and by
- * 19-Feb-2024		SP01MAR24		Mercedes Zambrana	add template_type
  *****************************************************************************/
 import {
 	OneToMany,
@@ -18,7 +17,8 @@ import {
 	BaseEntity,
 	Entity,
 	PrimaryGeneratedColumn,
-	Column
+	Column,
+	BeforeInsert
 } from 'typeorm';
 import FlowInstance from './FlowInstance';
 import Node from './Node';
@@ -69,4 +69,11 @@ export default class Flow extends PxpEntity{
 	@Column({name: 'template_type', type: 'varchar', nullable: false, length: 15 })
 	templateType: string;
 
+	@BeforeInsert()
+	async validateName() {
+		const existingFlow = await Flow.findOne({ where: { name: this.name , vendorId: this.vendorId} });
+		if (existingFlow) {
+			throw new Error('Name in use.');
+		}
+	}
 }

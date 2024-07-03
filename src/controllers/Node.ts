@@ -262,6 +262,9 @@ class Node extends Controller {
           ...(descValue && { descValue: descValue }),
           ...(verifyIfValueFromFieldMap(value as string) && { fromFieldMap: true, ...findFieldMapAndMetaData(value) }),
         }
+        if (schemaJsonObject[nameKey].hidden === true) {
+          schemaJsonObject[nameKey].initialValue = value;
+        }
       }
     }
     //console.log('111 schemaJsonObject',schemaJsonObject)

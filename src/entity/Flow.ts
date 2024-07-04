@@ -65,4 +65,7 @@ export default class Flow extends PxpEntity{
 	@Column({ name: 'modified_by', type: 'varchar', length: 500 })
 	modifiedBy: string;
 
+	@Column({ name: 'template_type', type: 'varchar', nullable: false, length: 15 })
+	templateType:string;
+
 }

@@ -38,7 +38,6 @@
   "dependencies": {
     "@pxp-nd/common": "^1.1.4",
     "@pxp-nd/core": "^1.1.13",
-    "@pxp-nd/flow": "^1.0.83",
     "axios": "^0.21.1",
     "lodash": "^4.17.21",
     "typeorm": "^0.2.36"

@@ -650,7 +650,6 @@ let Flow = class Flow extends core_1.Controller {
         const type = params._type;
         const vendorId = params._vendorId;
         const allowedColumns = ['name', 'description'];
-        console.log('params', params.filter);
         const filter = (params === null || params === void 0 ? void 0 : params.filter) ? JSON.parse(params === null || params === void 0 ? void 0 : params.filter) : null;
         const filters = (filter === null || filter === void 0 ? void 0 : filter.items) || [];
         const logicOperator = ((_a = filter === null || filter === void 0 ? void 0 : filter.logicOperator) === null || _a === void 0 ? void 0 : _a.toUpperCase()) || 'AND';
@@ -730,7 +729,6 @@ let Flow = class Flow extends core_1.Controller {
                 default:
                     throw new Error(`Operator ${operator} is not supported.`);
             }
-            console.log('=======condition=====', condition);
             if (index === 0) {
                 queryBuilder.andWhere(condition);
             }

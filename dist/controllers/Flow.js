@@ -645,10 +645,15 @@ let Flow = class Flow extends core_1.Controller {
         }
     }
     async basicFlowList(params) {
+        var _a;
         const isActive = params._isActive;
         const type = params._type;
         const vendorId = params._vendorId;
         const allowedColumns = ['name', 'description'];
+        console.log('params', params.filter);
+        const filter = (params === null || params === void 0 ? void 0 : params.filter) ? JSON.parse(params === null || params === void 0 ? void 0 : params.filter) : null;
+        const filters = (filter === null || filter === void 0 ? void 0 : filter.items) || [];
+        const logicOperator = ((_a = filter === null || filter === void 0 ? void 0 : filter.logicOperator) === null || _a === void 0 ? void 0 : _a.toUpperCase()) || 'AND';
         const queryBuilder = await (0, typeorm_1.getManager)()
             .createQueryBuilder()
             .select([
@@ -687,6 +692,53 @@ let Flow = class Flow extends core_1.Controller {
                 queryBuilder.andWhere(`f.${params.genericFilterFields} LIKE :genericFilterValue`, { genericFilterValue: `%${params.genericFilterValue}%` });
             }
         }
+        // Dynamic filters
+        filters.forEach((filter, index) => {
+            const { field, operator, value } = filter;
+            //if (allowedColumns.includes(field)) {
+            const queryField = `f.${field}`;
+            const parameterName = `filterValue${index}`;
+            let condition;
+            switch (operator) {
+                case 'contains':
+                    condition = `${queryField} LIKE :${parameterName}`;
+                    queryBuilder.setParameter(parameterName, `%${value}%`);
+                    break;
+                case 'equals':
+                    condition = `${queryField} = :${parameterName}`;
+                    queryBuilder.setParameter(parameterName, value);
+                    break;
+                case 'startsWith':
+                    condition = `${queryField} LIKE :${parameterName}`;
+                    queryBuilder.setParameter(parameterName, `${value}%`);
+                    break;
+                case 'endsWith':
+                    condition = `${queryField} LIKE :${parameterName}`;
+                    queryBuilder.setParameter(parameterName, `%${value}`);
+                    break;
+                case 'isEmpty':
+                    condition = `${queryField} IS NULL OR ${queryField} = ''`;
+                    break;
+                case 'isNotEmpty':
+                    condition = `${queryField} IS NOT NULL AND ${queryField} <> ''`;
+                    break;
+                case 'isAnyOf':
+                    condition = `${queryField} IN (:...${parameterName})`;
+                    queryBuilder.setParameter(parameterName, value.split(',')); // Asume que `value` es una cadena separada por comas.
+                    break;
+                // Puedes agregar más casos aquí si hay otros operadores.
+                default:
+                    throw new Error(`Operator ${operator} is not supported.`);
+            }
+            console.log('=======condition=====', condition);
+            if (index === 0) {
+                queryBuilder.andWhere(condition);
+            }
+            else {
+                queryBuilder[logicOperator === 'OR' ? 'orWhere' : 'andWhere'](condition);
+            }
+            //}
+        });
         queryBuilder.groupBy([
             'f.flow_id',
             'f.vendor_id',

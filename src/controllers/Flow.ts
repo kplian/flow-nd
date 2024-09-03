@@ -840,6 +840,10 @@ class Flow extends Controller {
     const type = params._type;
     const vendorId = params._vendorId;
     const allowedColumns = ['name','description'];
+    const filter = params?.filter ? JSON.parse(params?.filter) : null;
+    const filters = filter?.items || [];
+    const logicOperator = filter?.logicOperator?.toUpperCase() || 'AND';
+
     const queryBuilder:any = await getManager()
         .createQueryBuilder()
           .select([
@@ -880,6 +884,56 @@ class Flow extends Controller {
            queryBuilder.andWhere(`f.${params.genericFilterFields} LIKE :genericFilterValue`, { genericFilterValue: `%${params.genericFilterValue}%`});
          }
       }
+
+
+    // Dynamic filters
+    filters.forEach((filter: any, index: number) => {
+      const { field, operator, value } = filter;
+      //if (allowedColumns.includes(field)) {
+        const queryField = `f.${field}`;
+        const parameterName = `filterValue${index}`;
+        let condition: string;
+
+        switch (operator) {
+          case 'contains':
+            condition = `${queryField} LIKE :${parameterName}`;
+            queryBuilder.setParameter(parameterName, `%${value}%`);
+            break;
+          case 'equals':
+            condition = `${queryField} = :${parameterName}`;
+            queryBuilder.setParameter(parameterName, value);
+            break;
+          case 'startsWith':
+            condition = `${queryField} LIKE :${parameterName}`;
+            queryBuilder.setParameter(parameterName, `${value}%`);
+            break;
+          case 'endsWith':
+            condition = `${queryField} LIKE :${parameterName}`;
+            queryBuilder.setParameter(parameterName, `%${value}`);
+            break;
+          case 'isEmpty':
+            condition = `${queryField} IS NULL OR ${queryField} = ''`;
+            break;
+          case 'isNotEmpty':
+            condition = `${queryField} IS NOT NULL AND ${queryField} <> ''`;
+            break;
+          case 'isAnyOf':
+            condition = `${queryField} IN (:...${parameterName})`;
+            queryBuilder.setParameter(parameterName, value.split(',')); // Asume que `value` es una cadena separada por comas.
+            break;
+          // Puedes agregar más casos aquí si hay otros operadores.
+          default:
+            throw new Error(`Operator ${operator} is not supported.`);
+        }
+
+        if (index === 0) {
+          queryBuilder.andWhere(condition);
+        } else {
+          queryBuilder[logicOperator === 'OR' ? 'orWhere' : 'andWhere'](condition);
+        }
+      //}
+    });
+
 
 
       queryBuilder.groupBy([

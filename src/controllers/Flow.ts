@@ -886,10 +886,9 @@ class Flow extends Controller {
       }
 
 
-    // Dynamic filters
-    filters.forEach((filter: any, index: number) => {
-      const { field, operator, value } = filter;
-      //if (allowedColumns.includes(field)) {
+    const applyDynamicFilters = (queryBuilder: any, filters: any[], logicOperator: string) => {
+      filters.forEach((filter: any, index: number) => {
+        const { field, operator, value } = filter;
         const queryField = `f.${field}`;
         const parameterName = `filterValue${index}`;
         let condition: string;
@@ -919,9 +918,8 @@ class Flow extends Controller {
             break;
           case 'isAnyOf':
             condition = `${queryField} IN (:...${parameterName})`;
-            queryBuilder.setParameter(parameterName, value.split(',')); // Asume que `value` es una cadena separada por comas.
+            queryBuilder.setParameter(parameterName, value.split(','));
             break;
-          // Puedes agregar más casos aquí si hay otros operadores.
           default:
             throw new Error(`Operator ${operator} is not supported.`);
         }
@@ -931,8 +929,13 @@ class Flow extends Controller {
         } else {
           queryBuilder[logicOperator === 'OR' ? 'orWhere' : 'andWhere'](condition);
         }
-      //}
-    });
+      });
+    };
+
+
+    // Dynamic filters
+    // Aplicar filtros dinámicos
+    applyDynamicFilters(queryBuilder, filters, logicOperator);
 
 
 
@@ -975,6 +978,8 @@ class Flow extends Controller {
                .select('COUNT(f.flow_id)', 'count')
                .from('twf_flow', 'f');
 
+
+
      // Optional filters for the count query
      if (isActive !== undefined) {
       countQuery.where('f.is_active = :isActive', { isActive });
@@ -992,6 +997,8 @@ class Flow extends Controller {
       }
     }
 
+    // Aplicar los mismos filtros dinámicos al query de conteo
+    applyDynamicFilters(countQuery, filters, logicOperator);
 
 
        const totalCount = await countQuery.getRawOne();

@@ -9,7 +9,8 @@
  * Date Change      ID              Author              Description
  * -----------      -----------     --------------      ------------------------------------
  * 04-Sep-2023      SP08SEP23       Rensi Arteaga       add modified at and by
- *****************************************************************************/
+ * 06-Dec-2024		8001237262		Mercedes Zambrana	add flow_type
+ ****************************************************************************/
 import {
 	OneToMany,
 	JoinColumn,
@@ -67,5 +68,8 @@ export default class Flow extends PxpEntity{
 
 	@Column({ name: 'template_type', type: 'varchar', nullable: false, length: 15 })
 	templateType:string;
+
+	@Column({ name: 'flow_type', type: 'varchar', nullable: true, length: 100 })
+	flowType:string;
 
 }

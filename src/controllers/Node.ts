@@ -9,6 +9,7 @@
  * 08-Jul-2021                  Favio Figueroa          Created
  * 04-Sep-2023    SP08SEP23     Rensi Arteaga           add modifiedAt for flows
  * 29-Sep-2023    SP06OCT23     Mercedes Zambrana       Add validation when flow is on
+ * 19-Jan-2025    8201489097    Favio Figueroa          Add Controller Validation
  * ******************************************************************************
  */
 
@@ -82,6 +83,7 @@ class Node extends Controller {
   @ReadOnly(false)
   @Log(true)
   async AddActionConfigJson(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+    let validated = { validated: true, msg: "SUCCESS" };
     let { nodeId: removed, __metadata: removed2, ...actionConfigJson } = params;
     Object.entries(params.__metadata).forEach(([nameKey, values]: [nameKey: string, values:any]) => {
       actionConfigJson[nameKey] = `{{ ${values.name} }}`
@@ -102,6 +104,30 @@ class Node extends Controller {
 
       }
     }
+    const {action: { actionType }} = dataNode;
+    const { validationController } = actionType;
+    if(validationController) {
+
+      validated = { validated: false, msg: "ERROR" };
+      const config = {
+        method: "post",
+        url: `http://localhost:${process.env.PORT}/api/${validationController}`,
+        headers: {
+          Authorization: "" + process.env.TOKEN_PXP_ND + "",
+          "Content-Type": "application/json",
+        },
+        data: actionConfigJson,
+      };
+
+      // @ts-ignore
+      const resValidationControllerAxios = await __(axios(config));
+      validated = resValidationControllerAxios.data || { validated: false, msg: "ERROR" };
+
+    }
+    if(!validated.validated) {
+      throw new PxpError(400, validated.msg);
+    }
+
       if (allowChange) {
         const upd = await __(manager.update(NodeModel, params.nodeId, {
           actionConfigJson: JSON.stringify(actionConfigJson),

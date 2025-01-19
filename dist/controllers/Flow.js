@@ -692,7 +692,6 @@ let Flow = class Flow extends core_1.Controller {
             }
         }
         const applyDynamicFilters = (queryBuilder, filters, logicOperator) => {
-            console.log('applyDynamicFilters', queryBuilder);
             filters.forEach((filter, index) => {
                 const { field, operator, value } = filter;
                 const queryField = `f.${field}`;

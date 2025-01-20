@@ -16,16 +16,23 @@
 import {EntityManager, getManager, IsNull, Not} from 'typeorm';
 import NodeModel from '../entity/Node';
 import NodeConnectionModel from '../entity/NodeConnection';
-import {
-  Controller,
-  Model, __, Log, Post, DbSettings, ReadOnly, Get, PxpError
-} from '@pxp-nd/core';
-import NodeInstanceModel from "../entity/NodeInstance";
+import {__, Controller, DbSettings, Log, Model, Post, PxpError, ReadOnly} from '@pxp-nd/core';
 import _ from 'lodash';
 import FieldMapEntity from "../entity/FieldMap";
 import OriginNameEntity from "../entity/OriginName";
 import axios from 'axios';
 import FlowModel from '../entity/Flow';
+
+
+interface InterfaceParamsExecuteValidationController {
+  validationController: string;
+  actionConfigJson: Record<any, any>;
+  showException?: boolean
+}
+interface InterfaceResExecuteValidationController {
+  validated: boolean;
+  msg: string;
+}
 
 @Model('flow-nd/Node')
 class Node extends Controller {
@@ -106,27 +113,7 @@ class Node extends Controller {
     }
     const {action: { actionType }} = dataNode;
     const { validationController } = actionType;
-    if(validationController) {
-
-      validated = { validated: false, msg: "ERROR" };
-      const config = {
-        method: "post",
-        url: `http://localhost:${process.env.PORT}/api/${validationController}`,
-        headers: {
-          Authorization: "" + process.env.TOKEN_PXP_ND + "",
-          "Content-Type": "application/json",
-        },
-        data: actionConfigJson,
-      };
-
-      // @ts-ignore
-      const resValidationControllerAxios = await __(axios(config));
-      validated = resValidationControllerAxios.data || { validated: false, msg: "ERROR" };
-
-    }
-    if(!validated.validated) {
-      throw new PxpError(400, validated.msg);
-    }
+    await this.executeValidationController({validationController, actionConfigJson, showException: true});
 
       if (allowChange) {
         const upd = await __(manager.update(NodeModel, params.nodeId, {
@@ -340,6 +327,39 @@ class Node extends Controller {
     return {
       ...resExecuteView[0]
     }
+  }
+
+
+  public async executeValidationController(params: InterfaceParamsExecuteValidationController): Promise<InterfaceResExecuteValidationController> {
+
+    const {
+      validationController,
+      actionConfigJson,
+        showException = false
+    } = params;
+
+    let validated = { validated: true, msg: "NOTHING TO VALIDATE" };
+
+    if(validationController) {
+      const config = {
+        method: "post",
+        url: `http://localhost:${process.env.PORT}/api/${validationController}`,
+        headers: {
+          Authorization: "" + process.env.TOKEN_PXP_ND + "",
+          "Content-Type": "application/json",
+        },
+        data: actionConfigJson,
+      };
+
+      // @ts-ignore
+      const resValidationControllerAxios = await __(axios(config));
+      validated = resValidationControllerAxios.data || {validated: false, msg: "ERROR"};
+      if(!validated.validated && showException) {
+        throw new PxpError(400, validated.msg);
+      }
+    }
+    return validated;
+
   }
 
 }

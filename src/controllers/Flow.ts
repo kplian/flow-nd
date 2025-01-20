@@ -33,6 +33,7 @@ import NodeConnectionModel from '../entity/NodeConnection';
 import FlowModel from '../entity/Flow';
 import FlowInstanceModel from '../entity/FlowInstance';
 import NodeInstanceModel from '../entity/NodeInstance';
+import NodeController from './Node';
 //import {configFacebookStrategy} from "./passport-facebook";
 
 
@@ -747,6 +748,9 @@ class Flow extends Controller {
         throw new PxpError(400, 'Your flow must have at least 2 steps. Please finish configuring it before start');
       }
       for (const node of nodes) {
+
+
+
         const configActionType = !node.action.actionType.schemaJson ? {} :  JSON.parse(node.action.actionType.schemaJson);
 
         const configAction = !node.action.schemaJson ? {} : JSON.parse(node.action.schemaJson);
@@ -767,6 +771,13 @@ class Flow extends Controller {
         const valueNode = !node.actionConfigJson ? {} : JSON.parse(node.actionConfigJson);
         const valueAction = !node.action.configJsonTemplate ? {} : JSON.parse(node.action.configJsonTemplate);
         const values = _.merge({}, valueAction, valueNode);
+
+        //valid controllerValidation
+        const {action: { actionType }} = node;
+        const { validationController } = actionType;
+        const nodeController = new NodeController('flow-nd');
+        await nodeController.executeValidationController({validationController, actionConfigJson: values, showException: true});
+        //end valid controller
 
         const missingRequired: string[] = [];
         required.forEach((property) => {

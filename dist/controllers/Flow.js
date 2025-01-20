@@ -65,6 +65,7 @@ const NodeConnection_1 = __importDefault(require("../entity/NodeConnection"));
 const Flow_1 = __importDefault(require("../entity/Flow"));
 const FlowInstance_1 = __importDefault(require("../entity/FlowInstance"));
 const NodeInstance_1 = __importDefault(require("../entity/NodeInstance"));
+const Node_2 = __importDefault(require("./Node"));
 //import {configFacebookStrategy} from "./passport-facebook";
 let Flow = class Flow extends core_1.Controller {
     async get(params) {
@@ -597,6 +598,12 @@ let Flow = class Flow extends core_1.Controller {
                 const valueNode = !node.actionConfigJson ? {} : JSON.parse(node.actionConfigJson);
                 const valueAction = !node.action.configJsonTemplate ? {} : JSON.parse(node.action.configJsonTemplate);
                 const values = _.merge({}, valueAction, valueNode);
+                //valid controllerValidation
+                const { action: { actionType } } = node;
+                const { validationController } = actionType;
+                const nodeController = new Node_2.default('flow-nd');
+                await nodeController.executeValidationController({ validationController, actionConfigJson: values, showException: true });
+                //end valid controller
                 const missingRequired = [];
                 required.forEach((property) => {
                     if (!values.hasOwnProperty(property)) {

@@ -1,6 +1,6 @@
 {
   "name": "@pxp-nd/flow",
-  "version": "1.0.90",
+  "version": "1.0.91",
   "description": "Workflow module for pxp-nd framework",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

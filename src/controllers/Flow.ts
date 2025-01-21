@@ -484,8 +484,14 @@ class Flow extends Controller {
       cond =  " and at.name= 'EVENT' ";
     }else{
       const oName= totalNodes?.action?.originName;
-//
-      cond = `and at.name != 'EVENT' and (a.originName is null or a.originName = '${oName}')`;
+      if (flow.templateType=='funnel'){
+        cond = `and (at.name ='PAGE') and (a.originName is null or a.originName = '${oName}')`;
+      }else{
+        cond = `and (at.name != 'EVENT' and at.name!='PAGE') and (a.originName is null or a.originName = '${oName}')`;
+      }
+
+
+
     }
 
     let actions = await getManager()

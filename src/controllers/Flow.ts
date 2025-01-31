@@ -208,6 +208,13 @@ class Flow extends Controller {
         throw new PxpError(400, 'Your flow is on. It is not possible to change the name');
       }
 
+      if (dataFlow.type=='template'){
+        dataFlow.code = params.code;
+        dataFlow.description = params.description;
+        dataFlow.icon = params.icon;
+        dataFlow.flowType = params.flowType;
+      }
+
       dataFlow.name = params.name;
       dataFlow.modifiedAt = new Date();
       dataFlow.modifiedBy = this.user.username

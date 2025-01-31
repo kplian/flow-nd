@@ -187,6 +187,12 @@ let Flow = class Flow extends core_1.Controller {
             if (dataFlow.status == 'on') {
                 throw new core_1.PxpError(400, 'Your flow is on. It is not possible to change the name');
             }
+            if (dataFlow.type == 'template') {
+                dataFlow.code = params.code;
+                dataFlow.description = params.description;
+                dataFlow.icon = params.icon;
+                dataFlow.flowType = params.flowType;
+            }
             dataFlow.name = params.name;
             dataFlow.modifiedAt = new Date();
             dataFlow.modifiedBy = this.user.username;

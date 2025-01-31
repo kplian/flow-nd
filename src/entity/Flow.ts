@@ -10,6 +10,7 @@
  * -----------      -----------     --------------      ------------------------------------
  * 04-Sep-2023      SP08SEP23       Rensi Arteaga       add modified at and by
  * 06-Dec-2024		8001237262		Mercedes Zambrana	add flow_type
+ * 31-Jan-2025		8035304698		Mercedes Zambrana	Change code to string
  ****************************************************************************/
 import {
 	OneToMany,
@@ -33,8 +34,8 @@ export default class Flow extends PxpEntity{
 	@Column({ name: 'vendor_id', type: 'int', nullable: false })
 	vendorId: number;
 
-	@Column({ type: 'int', nullable: false })
-	code: number;
+	@Column({ type: 'varchar', nullable: false, length: 20 })
+	code: string;
 
 	@Column({ type: 'varchar', nullable: false, length: 100 })
 	name: string;

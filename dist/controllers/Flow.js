@@ -17,6 +17,7 @@
  * 18-Aug-2023    SP25AUG23     Mercedes Zambrana      Add removeFlow
  * 01-Sep-2023    SP08SEP23     Rensi Arteaga          add base flow list
  * 16-Sep-2023    SP22SEP23     Mercedes Zambrana       Change GET to POST in insertEventFlow
+ * 28-Sep-2023    SP06OCT23     Mercedes Zambrana      Add Validation when change off status (validateFlow, deleteflow, saveFlow, saveflowName)
  * ******************************************************************************
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -62,6 +63,10 @@ const Node_1 = __importDefault(require("../entity/Node"));
 const Action_1 = __importDefault(require("../entity/Action"));
 const NodeConnection_1 = __importDefault(require("../entity/NodeConnection"));
 const Flow_1 = __importDefault(require("../entity/Flow"));
+const FlowInstance_1 = __importDefault(require("../entity/FlowInstance"));
+const NodeInstance_1 = __importDefault(require("../entity/NodeInstance"));
+const Node_2 = __importDefault(require("./Node"));
+//import {configFacebookStrategy} from "./passport-facebook";
 let Flow = class Flow extends core_1.Controller {
     async get(params) {
         const nodes = await Node_1.default.find({ flowId: params.flowId });
@@ -137,6 +142,9 @@ let Flow = class Flow extends core_1.Controller {
     async deleteFlow(params, manager) {
         let dataFlow = await (0, core_1.__)(Flow_1.default.findOne(params.flowId));
         if (dataFlow) {
+            if (dataFlow.status == 'on') {
+                throw new core_1.PxpError(400, 'Your flow is on. It is not possible to delete it');
+            }
             dataFlow.isActive = 0;
             dataFlow.enabled = 'N';
             dataFlow.modifiedAt = new Date();
@@ -176,6 +184,15 @@ let Flow = class Flow extends core_1.Controller {
     async saveFlowName(params, manager) {
         let dataFlow = await (0, core_1.__)(Flow_1.default.findOne(params.flowId));
         if (dataFlow) {
+            if (dataFlow.status == 'on') {
+                throw new core_1.PxpError(400, 'Your flow is on. It is not possible to change the name');
+            }
+            if (dataFlow.type == 'template') {
+                dataFlow.code = params.code;
+                dataFlow.description = params.description;
+                dataFlow.icon = params.icon;
+                dataFlow.flowType = params.flowType;
+            }
             dataFlow.name = params.name;
             dataFlow.modifiedAt = new Date();
             dataFlow.modifiedBy = this.user.username;
@@ -220,6 +237,8 @@ let Flow = class Flow extends core_1.Controller {
         let id = null;
         let newId = null;
         let flowId = null;
+        let allowModify = false;
+        let dataFlow = null;
         let taskIds = [];
         if (nodeRefIds.length === 0) {
             let nodeDelIdd = parseInt(params.board.deleteId.split("-")[1]);
@@ -229,9 +248,12 @@ let Flow = class Flow extends core_1.Controller {
                 }
             });
             flowId = lastNoded.flowId;
+            dataFlow = await (0, core_1.__)(Flow_1.default.findOne(flowId));
+            if (dataFlow.status == 'off') {
+                allowModify = true;
+            }
         }
         else {
-            flowId = params.board.flowId;
             for (const nodeId of nodeRefIds) {
                 if (nodeId != 'new') {
                     id = parseInt(nodeId.split("node-")[1]);
@@ -247,14 +269,26 @@ let Flow = class Flow extends core_1.Controller {
                         id = lastNode.nodeId;
                     }
                     taskIds.push(id);
-                    const connectionsToDel = await manager.find(NodeConnection_1.default, {
-                        where: { nodeIdChild: id }
-                    });
-                    if (connectionsToDel) {
-                        const originalNodeCIds = connectionsToDel.map((node) => node.nodeConnectionId);
-                        let flowNodeC = await (0, typeorm_1.getManager)().query(`DELETE
+                    if (!flowId) {
+                        const DataFlowId = await Node_1.default.findOne({
+                            where: {
+                                nodeId: id,
+                            }
+                        });
+                        flowId = DataFlowId.flowId;
+                    }
+                    dataFlow = await (0, core_1.__)(Flow_1.default.findOne(flowId));
+                    if (dataFlow.status == 'off') {
+                        allowModify = true;
+                        const connectionsToDel = await manager.find(NodeConnection_1.default, {
+                            where: { nodeIdChild: id }
+                        });
+                        if (connectionsToDel) {
+                            const originalNodeCIds = connectionsToDel.map((node) => node.nodeConnectionId);
+                            let flowNodeC = await (0, typeorm_1.getManager)().query(`DELETE
                                                        from twf_node_connection
                                                        WHERE node_connection_id = ${originalNodeCIds}`);
+                        }
                     }
                 }
                 else {
@@ -265,58 +299,73 @@ let Flow = class Flow extends core_1.Controller {
         if (params.board.origin == 'deleteTask') {
             let nodeDelId = parseInt(params.board.deleteId.split("-")[1]);
             if (nodeDelId) {
-                //If there are some nodes in node_connections after delete all records sent, to inactive node
-                let connectNoDel = await (0, typeorm_1.getManager)().query(`SELECT n.node_id
+                const flowIdDel = await Node_1.default.findOne({ nodeId: nodeDelId });
+                flowId = flowIdDel.flowId;
+                dataFlow = await (0, core_1.__)(Flow_1.default.findOne(flowId));
+                if (dataFlow.status == 'off') {
+                    allowModify = true;
+                    //If there are some nodes in node_connections after delete all records sent, to inactive node
+                    let connectNoDel = await (0, typeorm_1.getManager)().query(`SELECT n.node_id
                                                     from twf_node_connection nd
                                                            inner join twf_node n on n.node_id = nd.node_id_child
                                                     WHERE n.node_id = ${nodeDelId}`);
-                const currentNodesIds = connectNoDel.map((record) => record.node_id);
-                // Get nodes to remove
-                const nodesToRemove = currentNodesIds.filter((nodeId) => !taskIds.includes(nodeId.toString()));
-                // Inactive nodes
-                if (nodesToRemove.length > 0) {
-                    const delNodeConnect = await manager.delete(NodeConnection_1.default, { nodeIdChild: nodesToRemove[0] });
-                    if (delNodeConnect) {
-                        let dNode = `UPDATE twf_node
+                    const currentNodesIds = connectNoDel.map((record) => record.node_id);
+                    // Get nodes to remove
+                    const nodesToRemove = currentNodesIds.filter((nodeId) => !taskIds.includes(nodeId.toString()));
+                    // Inactive nodes
+                    if (nodesToRemove.length > 0) {
+                        const delNodeConnect = await manager.delete(NodeConnection_1.default, { nodeIdChild: nodesToRemove[0] });
+                        if (delNodeConnect) {
+                            let dNode = `UPDATE twf_node
                         SET is_active = 'N'
                         WHERE node_id = ${nodesToRemove[0]}`;
-                        await manager.query(dNode);
+                            await manager.query(dNode);
+                        }
                     }
+                }
+                else {
+                    throw new core_1.PxpError(400, 'Please turn off the flow before make a change');
                 }
             }
         }
         if (nodeRefIds.length === 0) {
         }
         else {
-            for (const nodeId of taskIds) {
-                if (nodeId === 'new') {
-                    //get information about Action
-                    const newAction = await Action_1.default.findOne({ code: nodes[`${nodeId}`].action.code });
-                    const newNode = manager.create(Node_1.default, {
-                        nodeId: undefined,
-                        flowId: nodes[`${nodeId}`].flowId,
-                        isInit: 'N',
-                        actionId: newAction.actionId
+            dataFlow = await (0, core_1.__)(Flow_1.default.findOne(flowId));
+            if (dataFlow.status == 'off') {
+                allowModify = true;
+                for (const nodeId of taskIds) {
+                    if (nodeId === 'new') {
+                        //get information about Action
+                        const newAction = await Action_1.default.findOne({ code: nodes[`${nodeId}`].action.code });
+                        const newNode = manager.create(Node_1.default, {
+                            nodeId: undefined,
+                            flowId: nodes[`${nodeId}`].flowId,
+                            isInit: 'N',
+                            actionId: newAction.actionId
+                        });
+                        const saveNode = await manager.save(newNode);
+                        id = saveNode.nodeId;
+                        newId = saveNode.nodeId;
+                    }
+                    else {
+                        id = nodeId;
+                    }
+                    //save in node and node_connection
+                    const newConnection = manager.create(NodeConnection_1.default, {
+                        nodeConnectionId: undefined,
+                        nodeIdMaster: masterId,
+                        nodeIdChild: id,
                     });
-                    const saveNode = await manager.save(newNode);
-                    id = saveNode.nodeId;
-                    newId = saveNode.nodeId;
+                    masterId = id;
+                    const savedNodes = await manager.save(newConnection);
                 }
-                else {
-                    id = nodeId;
-                }
-                //save in node and node_connection
-                const newConnection = manager.create(NodeConnection_1.default, {
-                    nodeConnectionId: undefined,
-                    nodeIdMaster: masterId,
-                    nodeIdChild: id,
-                });
-                masterId = id;
-                const savedNodes = await manager.save(newConnection);
+            }
+            else {
+                throw new core_1.PxpError(400, 'Please turn off the flow before make a change');
             }
         }
-        let dataFlow = await (0, core_1.__)(Flow_1.default.findOne(flowId));
-        if (dataFlow) {
+        if (dataFlow && allowModify) {
             dataFlow.modifiedAt = new Date();
             dataFlow.modifiedBy = this.user.username;
             await (0, core_1.__)(manager.save(dataFlow));
@@ -341,8 +390,12 @@ let Flow = class Flow extends core_1.Controller {
         }
         else {
             const oName = (_a = totalNodes === null || totalNodes === void 0 ? void 0 : totalNodes.action) === null || _a === void 0 ? void 0 : _a.originName;
-            //
-            cond = `and at.name != 'EVENT' and (a.originName is null or a.originName = '${oName}')`;
+            if (flow.templateType == 'funnel') {
+                cond = `and (at.name ='PAGE') and (a.originName is null or a.originName = '${oName}')`;
+            }
+            else {
+                cond = `and (at.name != 'EVENT' and at.name!='PAGE') and (a.originName is null or a.originName = '${oName}')`;
+            }
         }
         let actions = await (0, typeorm_1.getManager)()
             .createQueryBuilder(Action_1.default, "a")
@@ -513,11 +566,12 @@ let Flow = class Flow extends core_1.Controller {
         let dataFlow = await (0, core_1.__)(Flow_1.default.findOne(params.flowId));
         if (dataFlow) {
             if (dataFlow.status === 'off') {
-                await this.validateFlow(params.flowId, manager);
+                await this.validateFlow(params.flowId, manager, 'on');
                 //change to active
                 dataFlow.status = 'on';
             }
             else {
+                await this.validateFlow(params.flowId, manager, 'off');
                 dataFlow.status = 'off';
             }
             dataFlow.modifiedAt = new Date();
@@ -529,51 +583,93 @@ let Flow = class Flow extends core_1.Controller {
             return { success: false };
         }
     }
-    async validateFlow(flowId, manager) {
-        const nodes = await Node_1.default.find({ flowId, isActive: true });
-        let res = '';
-        if (nodes.length < 2) {
-            throw new core_1.PxpError(400, 'Your flow must have at least 2 steps. Please finish configuring it before start');
+    async validateFlow(flowId, manager, status) {
+        if (status == 'on') {
+            const nodes = await Node_1.default.find({ flowId, isActive: true });
+            let res = '';
+            if (nodes.length < 2) {
+                throw new core_1.PxpError(400, 'Your flow must have at least 2 steps. Please finish configuring it before start');
+            }
+            for (const node of nodes) {
+                const configActionType = !node.action.actionType.schemaJson ? {} : JSON.parse(node.action.actionType.schemaJson);
+                const configAction = !node.action.schemaJson ? {} : JSON.parse(node.action.schemaJson);
+                const config = _.merge({}, configActionType, configAction);
+                const required = [];
+                for (const key in config) {
+                    if (config.hasOwnProperty(key)) {
+                        const prop = config[key];
+                        if (prop && typeof prop === "object" &&
+                            ((prop.validate && prop.validate.shape.includes('required')) ||
+                                (prop.formComponent && prop.formComponent.validate && prop.formComponent.validate.shape.includes('required')))) {
+                            required.push(key);
+                        }
+                    }
+                }
+                const valueNode = !node.actionConfigJson ? {} : JSON.parse(node.actionConfigJson);
+                const valueAction = !node.action.configJsonTemplate ? {} : JSON.parse(node.action.configJsonTemplate);
+                const values = _.merge({}, valueAction, valueNode);
+                //valid controllerValidation
+                const { action: { actionType } } = node;
+                const { validationController } = actionType;
+                const nodeController = new Node_2.default('flow-nd');
+                await nodeController.executeValidationController({ validationController, actionConfigJson: values, showException: true });
+                //end valid controller
+                const missingRequired = [];
+                required.forEach((property) => {
+                    if (!values.hasOwnProperty(property)) {
+                        missingRequired.push(property);
+                    }
+                });
+                if (missingRequired.length > 0) {
+                    res += `In node ${node.action.name} you have missing fields: ${missingRequired.join(', ')}, `;
+                }
+            }
+            if (res != '') {
+                res = res.slice(0, -2);
+                throw new core_1.PxpError(400, 'Please resolve these issues before starting the flow: ' + res);
+            }
+            return true;
         }
-        for (const node of nodes) {
-            const configActionType = !node.action.actionType.schemaJson ? {} : JSON.parse(node.action.actionType.schemaJson);
-            const configAction = !node.action.schemaJson ? {} : JSON.parse(node.action.schemaJson);
-            const config = _.merge({}, configActionType, configAction);
-            const required = [];
-            for (const key in config) {
-                if (config.hasOwnProperty(key)) {
-                    const prop = config[key];
-                    if (prop && typeof prop === "object" &&
-                        ((prop.validate && prop.validate.shape.includes('required')) ||
-                            (prop.formComponent && prop.formComponent.validate && prop.formComponent.validate.shape.includes('required')))) {
-                        required.push(key);
+        else {
+            const flowInstances = await FlowInstance_1.default.find({ flowId, isActive: true });
+            const validFlowInstances = [];
+            for (const flowInstance of flowInstances) {
+                if (flowInstance.status != 'processed') {
+                    validFlowInstances.push(flowInstance.flowInstanceId);
+                }
+                else {
+                    let flowInstanceId = flowInstance.flowInstanceId;
+                    const totalNI = await NodeInstance_1.default.find({ flowInstanceId, isActive: true });
+                    const nodeInstances = await (0, typeorm_1.getManager)().transaction(async (transactionalEntityManager) => {
+                        const queryBuilder = transactionalEntityManager.createQueryBuilder(NodeInstance_1.default, 'node_instance');
+                        queryBuilder
+                            .where('node_instance.flowInstanceId = :flowInstanceId', { flowInstanceId })
+                            .andWhere('((node_instance.status IS NULL AND node_instance.schedule = :schedule) OR (node_instance.status = :status AND node_instance.schedule != :schedule))', {
+                            status: 'executed',
+                            schedule: '0000-00-00 00:00:00',
+                        });
+                        return queryBuilder.getMany();
+                    });
+                    if (totalNI.length > nodeInstances.length) {
+                        validFlowInstances.push(flowInstanceId);
                     }
                 }
             }
-            const valueNode = !node.actionConfigJson ? {} : JSON.parse(node.actionConfigJson);
-            const valueAction = !node.action.configJsonTemplate ? {} : JSON.parse(node.action.configJsonTemplate);
-            const values = _.merge({}, valueAction, valueNode);
-            const missingRequired = [];
-            required.forEach((property) => {
-                if (!values.hasOwnProperty(property)) {
-                    missingRequired.push(property);
-                }
-            });
-            if (missingRequired.length > 0) {
-                res += `In node ${node.action.name} you have missing fields: ${missingRequired.join(', ')}, `;
+            if (validFlowInstances.length > 0) {
+                throw new core_1.PxpError(400, 'Your flow have at least 1 instance active. Please finish it before change off');
             }
+            return true;
         }
-        if (res != '') {
-            res = res.slice(0, -2);
-            throw new core_1.PxpError(400, 'Please resolve these issues before starting the flow: ' + res);
-        }
-        return true;
     }
     async basicFlowList(params) {
+        var _a;
         const isActive = params._isActive;
         const type = params._type;
         const vendorId = params._vendorId;
         const allowedColumns = ['name', 'description'];
+        const filter = (params === null || params === void 0 ? void 0 : params.filter) ? JSON.parse(params === null || params === void 0 ? void 0 : params.filter) : null;
+        const filters = (filter === null || filter === void 0 ? void 0 : filter.items) || [];
+        const logicOperator = ((_a = filter === null || filter === void 0 ? void 0 : filter.logicOperator) === null || _a === void 0 ? void 0 : _a.toUpperCase()) || 'AND';
         const queryBuilder = await (0, typeorm_1.getManager)()
             .createQueryBuilder()
             .select([
@@ -612,6 +708,53 @@ let Flow = class Flow extends core_1.Controller {
                 queryBuilder.andWhere(`f.${params.genericFilterFields} LIKE :genericFilterValue`, { genericFilterValue: `%${params.genericFilterValue}%` });
             }
         }
+        const applyDynamicFilters = (queryBuilder, filters, logicOperator) => {
+            filters.forEach((filter, index) => {
+                const { field, operator, value } = filter;
+                const queryField = `f.${field}`;
+                const parameterName = `filterValue${index}`;
+                let condition;
+                switch (operator) {
+                    case 'contains':
+                        condition = `${queryField} LIKE :${parameterName}`;
+                        queryBuilder.setParameter(parameterName, `%${value}%`);
+                        break;
+                    case 'equals':
+                        condition = `${queryField} = :${parameterName}`;
+                        queryBuilder.setParameter(parameterName, value);
+                        break;
+                    case 'startsWith':
+                        condition = `${queryField} LIKE :${parameterName}`;
+                        queryBuilder.setParameter(parameterName, `${value}%`);
+                        break;
+                    case 'endsWith':
+                        condition = `${queryField} LIKE :${parameterName}`;
+                        queryBuilder.setParameter(parameterName, `%${value}`);
+                        break;
+                    case 'isEmpty':
+                        condition = `${queryField} IS NULL OR ${queryField} = ''`;
+                        break;
+                    case 'isNotEmpty':
+                        condition = `${queryField} IS NOT NULL AND ${queryField} <> ''`;
+                        break;
+                    case 'isAnyOf':
+                        condition = `${queryField} IN (:...${parameterName})`;
+                        queryBuilder.setParameter(parameterName, value.split(','));
+                        break;
+                    default:
+                        throw new Error(`Operator ${operator} is not supported.`);
+                }
+                if (index === 0) {
+                    queryBuilder.andWhere(condition);
+                }
+                else {
+                    queryBuilder[logicOperator === 'OR' ? 'orWhere' : 'andWhere'](condition);
+                }
+            });
+        };
+        // Dynamic filters
+        // Aplicar filtros dinámicos
+        applyDynamicFilters(queryBuilder, filters, logicOperator);
         queryBuilder.groupBy([
             'f.flow_id',
             'f.vendor_id',
@@ -657,6 +800,8 @@ let Flow = class Flow extends core_1.Controller {
                 countQuery.andWhere(`f.${params.genericFilterFields} LIKE :genericFilterValue`, { genericFilterValue: `%${params.genericFilterValue}%` });
             }
         }
+        // Aplicar los mismos filtros dinámicos al query de conteo
+        applyDynamicFilters(countQuery, filters, logicOperator);
         const totalCount = await countQuery.getRawOne();
         const count = totalCount.count;
         return { data, count };

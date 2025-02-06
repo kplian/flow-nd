@@ -9,22 +9,30 @@
  * 08-Jul-2021                  Favio Figueroa          Created
  * 04-Sep-2023    SP08SEP23     Rensi Arteaga           add modifiedAt for flows
  * 29-Sep-2023    SP06OCT23     Mercedes Zambrana       Add validation when flow is on
+ * 19-Jan-2025    8201489097    Favio Figueroa          Add Controller Validation
  * ******************************************************************************
  */
 
 import {EntityManager, getManager, IsNull, Not} from 'typeorm';
 import NodeModel from '../entity/Node';
 import NodeConnectionModel from '../entity/NodeConnection';
-import {
-  Controller,
-  Model, __, Log, Post, DbSettings, ReadOnly, Get, PxpError
-} from '@pxp-nd/core';
-import NodeInstanceModel from "../entity/NodeInstance";
+import {__, Controller, DbSettings, Log, Model, Post, PxpError, ReadOnly} from '@pxp-nd/core';
 import _ from 'lodash';
 import FieldMapEntity from "../entity/FieldMap";
 import OriginNameEntity from "../entity/OriginName";
 import axios from 'axios';
 import FlowModel from '../entity/Flow';
+
+
+interface InterfaceParamsExecuteValidationController {
+  validationController: string;
+  actionConfigJson: Record<any, any>;
+  showException?: boolean
+}
+interface InterfaceResExecuteValidationController {
+  validated: boolean;
+  msg: string;
+}
 
 @Model('flow-nd/Node')
 class Node extends Controller {
@@ -82,6 +90,7 @@ class Node extends Controller {
   @ReadOnly(false)
   @Log(true)
   async AddActionConfigJson(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+    let validated = { validated: true, msg: "SUCCESS" };
     let { nodeId: removed, __metadata: removed2, ...actionConfigJson } = params;
     Object.entries(params.__metadata).forEach(([nameKey, values]: [nameKey: string, values:any]) => {
       actionConfigJson[nameKey] = `{{ ${values.name} }}`
@@ -102,6 +111,10 @@ class Node extends Controller {
 
       }
     }
+    const {action: { actionType }} = dataNode;
+    const { validationController } = actionType;
+    await this.executeValidationController({validationController, actionConfigJson, showException: true});
+
       if (allowChange) {
         const upd = await __(manager.update(NodeModel, params.nodeId, {
           actionConfigJson: JSON.stringify(actionConfigJson),
@@ -222,7 +235,9 @@ class Node extends Controller {
 
         // @ts-ignore
         const resControllerAxios = await __(axios(config));
+        console.log('resControllerAxios',resControllerAxios)
         const desc = resControllerAxios.data.data[descDD];
+
         return desc;
 
       } else if(json.formComponentTemplate && json.configGetDescValue) { // todo we need to see how works here
@@ -250,12 +265,18 @@ class Node extends Controller {
     
     for (const [nameKey, value] of Object.entries(mergeValues)) {
       if(schemaJsonObject[nameKey]) {
-        const descValue = await __(findFieldInConfigForComponent(schemaJsonObject[nameKey], value));
+        let descValue;
+        if(value) {
+          descValue = await __(findFieldInConfigForComponent(schemaJsonObject[nameKey], value));
+        }
         schemaJsonObject[nameKey] = {
           ...schemaJsonObject[nameKey],
           initialValue: value,
           ...(descValue && { descValue: descValue }),
           ...(verifyIfValueFromFieldMap(value as string) && { fromFieldMap: true, ...findFieldMapAndMetaData(value) }),
+        }
+        if (schemaJsonObject[nameKey].hidden === true) {
+          schemaJsonObject[nameKey].initialValue = value;
         }
       }
     }
@@ -306,6 +327,39 @@ class Node extends Controller {
     return {
       ...resExecuteView[0]
     }
+  }
+
+
+  public async executeValidationController(params: InterfaceParamsExecuteValidationController): Promise<InterfaceResExecuteValidationController> {
+
+    const {
+      validationController,
+      actionConfigJson,
+        showException = false
+    } = params;
+
+    let validated = { validated: true, msg: "NOTHING TO VALIDATE" };
+
+    if(validationController) {
+      const config = {
+        method: "post",
+        url: `http://localhost:${process.env.PORT}/api/${validationController}`,
+        headers: {
+          Authorization: "" + process.env.TOKEN_PXP_ND + "",
+          "Content-Type": "application/json",
+        },
+        data: actionConfigJson,
+      };
+
+      // @ts-ignore
+      const resValidationControllerAxios = await __(axios(config));
+      validated = resValidationControllerAxios.data || {validated: false, msg: "ERROR"};
+      if(!validated.validated && showException) {
+        throw new PxpError(400, validated.msg);
+      }
+    }
+    return validated;
+
   }
 
 }

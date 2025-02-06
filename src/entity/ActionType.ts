@@ -1,3 +1,16 @@
+/**
+ * ******************************************************************************
+ * NAME: Node.ts
+ * DEVELOPER: Favio Figueroa
+ * DESCRIPTION: Flow Controller
+ * REVISIONS:
+ * Date             Change ID     Author Description
+ *  -------------- ----------- -------------- ------------------------------------
+ * 08-Jul-2021                  Favio Figueroa          Created
+ * 19-Jan-2025    8201489097    Favio Figueroa          Added validation_controller
+ * ******************************************************************************
+ */
+
 import {
   OneToMany,
   JoinColumn,
@@ -45,6 +58,9 @@ export default class ActionType extends PxpEntity{
 
   @Column({ name: 'actions_json', type: 'text' })
   actionsJson: string;
+
+  @Column({ name: 'validation_controller', type: 'text' })
+  validationController: string;
 
   @OneToMany(() => Action, (action) => action.actionType)
   actions: Action[];

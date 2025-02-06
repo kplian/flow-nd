@@ -33,6 +33,7 @@ import NodeConnectionModel from '../entity/NodeConnection';
 import FlowModel from '../entity/Flow';
 import FlowInstanceModel from '../entity/FlowInstance';
 import NodeInstanceModel from '../entity/NodeInstance';
+import NodeController from './Node';
 //import {configFacebookStrategy} from "./passport-facebook";
 
 
@@ -205,6 +206,13 @@ class Flow extends Controller {
     if (dataFlow) {
       if (dataFlow.status =='on') {
         throw new PxpError(400, 'Your flow is on. It is not possible to change the name');
+      }
+
+      if (dataFlow.type=='template'){
+        dataFlow.code = params.code;
+        dataFlow.description = params.description;
+        dataFlow.icon = params.icon;
+        dataFlow.flowType = params.flowType;
       }
 
       dataFlow.name = params.name;
@@ -483,8 +491,14 @@ class Flow extends Controller {
       cond =  " and at.name= 'EVENT' ";
     }else{
       const oName= totalNodes?.action?.originName;
-//
-      cond = `and at.name != 'EVENT' and (a.originName is null or a.originName = '${oName}')`;
+      if (flow.templateType=='funnel'){
+        cond = `and (at.name ='PAGE') and (a.originName is null or a.originName = '${oName}')`;
+      }else{
+        cond = `and (at.name != 'EVENT' and at.name!='PAGE') and (a.originName is null or a.originName = '${oName}')`;
+      }
+
+
+
     }
 
     let actions = await getManager()
@@ -747,6 +761,9 @@ class Flow extends Controller {
         throw new PxpError(400, 'Your flow must have at least 2 steps. Please finish configuring it before start');
       }
       for (const node of nodes) {
+
+
+
         const configActionType = !node.action.actionType.schemaJson ? {} :  JSON.parse(node.action.actionType.schemaJson);
 
         const configAction = !node.action.schemaJson ? {} : JSON.parse(node.action.schemaJson);
@@ -767,6 +784,13 @@ class Flow extends Controller {
         const valueNode = !node.actionConfigJson ? {} : JSON.parse(node.actionConfigJson);
         const valueAction = !node.action.configJsonTemplate ? {} : JSON.parse(node.action.configJsonTemplate);
         const values = _.merge({}, valueAction, valueNode);
+
+        //valid controllerValidation
+        const {action: { actionType }} = node;
+        const { validationController } = actionType;
+        const nodeController = new NodeController('flow-nd');
+        await nodeController.executeValidationController({validationController, actionConfigJson: values, showException: true});
+        //end valid controller
 
         const missingRequired: string[] = [];
         required.forEach((property) => {
@@ -840,6 +864,10 @@ class Flow extends Controller {
     const type = params._type;
     const vendorId = params._vendorId;
     const allowedColumns = ['name','description'];
+    const filter = params?.filter ? JSON.parse(params?.filter) : null;
+    const filters = filter?.items || [];
+    const logicOperator = filter?.logicOperator?.toUpperCase() || 'AND';
+
     const queryBuilder:any = await getManager()
         .createQueryBuilder()
           .select([
@@ -882,6 +910,59 @@ class Flow extends Controller {
       }
 
 
+    const applyDynamicFilters = (queryBuilder: any, filters: any[], logicOperator: string) => {
+      filters.forEach((filter: any, index: number) => {
+        const { field, operator, value } = filter;
+        const queryField = `f.${field}`;
+        const parameterName = `filterValue${index}`;
+        let condition: string;
+
+        switch (operator) {
+          case 'contains':
+            condition = `${queryField} LIKE :${parameterName}`;
+            queryBuilder.setParameter(parameterName, `%${value}%`);
+            break;
+          case 'equals':
+            condition = `${queryField} = :${parameterName}`;
+            queryBuilder.setParameter(parameterName, value);
+            break;
+          case 'startsWith':
+            condition = `${queryField} LIKE :${parameterName}`;
+            queryBuilder.setParameter(parameterName, `${value}%`);
+            break;
+          case 'endsWith':
+            condition = `${queryField} LIKE :${parameterName}`;
+            queryBuilder.setParameter(parameterName, `%${value}`);
+            break;
+          case 'isEmpty':
+            condition = `${queryField} IS NULL OR ${queryField} = ''`;
+            break;
+          case 'isNotEmpty':
+            condition = `${queryField} IS NOT NULL AND ${queryField} <> ''`;
+            break;
+          case 'isAnyOf':
+            condition = `${queryField} IN (:...${parameterName})`;
+            queryBuilder.setParameter(parameterName, value.split(','));
+            break;
+          default:
+            throw new Error(`Operator ${operator} is not supported.`);
+        }
+
+        if (index === 0) {
+          queryBuilder.andWhere(condition);
+        } else {
+          queryBuilder[logicOperator === 'OR' ? 'orWhere' : 'andWhere'](condition);
+        }
+      });
+    };
+
+
+    // Dynamic filters
+    // Aplicar filtros dinámicos
+    applyDynamicFilters(queryBuilder, filters, logicOperator);
+
+
+
       queryBuilder.groupBy([
         'f.flow_id',
         'f.vendor_id',
@@ -921,6 +1002,8 @@ class Flow extends Controller {
                .select('COUNT(f.flow_id)', 'count')
                .from('twf_flow', 'f');
 
+
+
      // Optional filters for the count query
      if (isActive !== undefined) {
       countQuery.where('f.is_active = :isActive', { isActive });
@@ -938,6 +1021,8 @@ class Flow extends Controller {
       }
     }
 
+    // Aplicar los mismos filtros dinámicos al query de conteo
+    applyDynamicFilters(countQuery, filters, logicOperator);
 
 
        const totalCount = await countQuery.getRawOne();

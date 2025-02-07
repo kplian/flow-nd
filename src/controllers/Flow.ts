@@ -17,6 +17,7 @@
  * 01-Sep-2023    SP08SEP23     Rensi Arteaga          add base flow list
  * 16-Sep-2023    SP22SEP23     Mercedes Zambrana       Change GET to POST in insertEventFlow
  * 28-Sep-2023    SP06OCT23     Mercedes Zambrana      Add Validation when change off status (validateFlow, deleteflow, saveFlow, saveflowName)
+ * 07-Feb-2025    8353064698    Mercedes Zambrana      Add validation for opt in page when flow si funnel
  * ******************************************************************************
  */
 
@@ -488,7 +489,13 @@ class Flow extends Controller {
     let cond = " and 0=0";
 
     if (!totalNodes){
+      if (flow.templateType=='funnel'){
+        cond = " and a.name='Opt-In Page' ";
+      }else{
       cond =  " and at.name= 'EVENT' ";
+      }
+
+
     }else{
       const oName= totalNodes?.action?.originName;
       if (flow.templateType=='funnel'){

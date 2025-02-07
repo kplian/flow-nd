@@ -18,6 +18,7 @@
  * 01-Sep-2023    SP08SEP23     Rensi Arteaga          add base flow list
  * 16-Sep-2023    SP22SEP23     Mercedes Zambrana       Change GET to POST in insertEventFlow
  * 28-Sep-2023    SP06OCT23     Mercedes Zambrana      Add Validation when change off status (validateFlow, deleteflow, saveFlow, saveflowName)
+ * 07-Feb-2025    8353064698    Mercedes Zambrana      Add validation for opt in page when flow si funnel change
  * ******************************************************************************
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -217,14 +218,11 @@ let Flow = class Flow extends core_1.Controller {
             let flowDataClone;
             //if we have a vendoId as parameter the origin is a template
             if (params.vendorId) {
-                console.log("con vendor:", flowToClone);
                 flowDataClone = await manager.save(Flow_1.default, { ...flowToClone, name: `${params.name}`, vendorId: params.vendorId, type: 'custom' });
             }
             else {
-                console.log("sin vendore:", flowToClone);
                 flowDataClone = await manager.save(Flow_1.default, { ...flowToClone, name: `${flowData.name} Copy` });
             }
-            console.log("el clonado:::", flowDataClone);
             const dataNode = await Node_1.default.findOne({ where: { flowId: params.flowId, isInit: 'Y', isActive: true }, order: { nodeId: "ASC" } });
             dataNode && await this.copyNode(dataNode, flowDataClone.flowId, manager, true);
             return { success: true, flowId: flowDataClone.flowId };
@@ -399,13 +397,12 @@ let Flow = class Flow extends core_1.Controller {
         else {
             const oName = (_a = totalNodes === null || totalNodes === void 0 ? void 0 : totalNodes.action) === null || _a === void 0 ? void 0 : _a.originName;
             if (flow.templateType == 'funnel') {
-                cond = `and (at.name ='PAGE') and (a.originName is null or a.originName = '${oName}')`;
+                cond = `and (at.name ='PAGE' || at.name = 'CHAINED FLOW') and (a.originName is null or a.originName = '${oName}')`;
             }
             else {
-                cond = `and (at.name != 'EVENT' and at.name!='PAGE') and (a.originName is null or a.originName = '${oName}')`;
+                cond = `and (at.name != 'EVENT' and at.name!='PAGE' and at.name!='CHAINED FLOW') and (a.originName is null or a.originName = '${oName}')`;
             }
         }
-        console.log("condicion es:", cond);
         let actions = await (0, typeorm_1.getManager)()
             .createQueryBuilder(Action_1.default, "a")
             .select([
@@ -419,7 +416,6 @@ let Flow = class Flow extends core_1.Controller {
             .innerJoin("a.actionType", "at")
             .where(`a.isActive = 1 and a.hidden = 'N'` + cond)
             .getMany();
-        console.log("actions:", actions);
         const connections = await (0, typeorm_1.getManager)()
             .createQueryBuilder(NodeConnection_1.default, "nc")
             .select([

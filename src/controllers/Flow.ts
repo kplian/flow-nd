@@ -35,6 +35,7 @@ import FlowModel from '../entity/Flow';
 import FlowInstanceModel from '../entity/FlowInstance';
 import NodeInstanceModel from '../entity/NodeInstance';
 import NodeController from './Node';
+import axios, { AxiosRequestConfig } from 'axios';
 //import {configFacebookStrategy} from "./passport-facebook";
 
 
@@ -404,6 +405,33 @@ class Flow extends Controller {
                 await manager.query(dNode);
               }
             }
+
+            if (flowIdDel.action.actionType.name === 'CHAINED FLOW') {
+              if (flowIdDel.action?.configJsonTemplate && flowIdDel.actionConfigJson) {
+                try {
+                  const parsedConfig = JSON.parse(flowIdDel.action.configJsonTemplate);
+                  const parsedValues = JSON.parse(flowIdDel.actionConfigJson);
+                  
+                  
+                  if (parsedConfig.deleteController && parsedValues.flowId) {
+                    const params = {
+                      flowId: parsedValues.flowId,
+                    }
+                    const config = {
+                      method: "post",
+                      url: `http://localhost:${process.env.PORT}/api/${parsedConfig.addController}`,
+                      headers: {
+                        Authorization: "" + process.env.TOKEN_PXP_ND + "",
+                        "Content-Type": "application/json",
+                      },
+                      data: params,
+                    };
+                  }
+                } catch (error) {
+                  console.error("Not valid json", error);
+                }
+              }
+             }
           }else{
             throw new PxpError(400, 'Please turn off the flow before make a change');
           }
@@ -435,6 +463,41 @@ class Flow extends Controller {
              const saveNode = await manager.save(newNode);
              id = saveNode.nodeId;
              newId = saveNode.nodeId;
+             if (newAction.actionType.name === 'CHAINED FLOW') {
+              if (newAction?.configJsonTemplate) {
+                try {
+                  const parsedConfig = JSON.parse(newAction.configJsonTemplate);
+                  
+                  if (parsedConfig.addController && parsedConfig.template) {
+                    const params = {
+                      template: parsedConfig.template, 
+                      flowId,
+                    }
+                    const config: AxiosRequestConfig = {
+                      method: "post",
+                      url: `http://localhost:${process.env.PORT}/api/${parsedConfig.addController}`,
+                      headers: {
+                        Authorization: "" + process.env.TOKEN_PXP_ND + "",
+                        "Content-Type": "application/json",
+                      },
+                      data: params,
+                    };
+                    const resControllerAxios = await axios(config);
+                    const chainedFlowId = resControllerAxios.data?.flowId;
+                    const parsedValues = {
+                      flowId: chainedFlowId
+                    }
+
+                    saveNode.actionConfigJson = JSON.stringify(parsedValues);
+
+                    await manager.save(saveNode);
+
+                  }
+                } catch (error) {
+                  console.error("Not valid json", error);
+                }
+              }
+             }
            } else {
              id = nodeId;
            }

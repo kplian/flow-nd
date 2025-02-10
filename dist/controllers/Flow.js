@@ -18,6 +18,7 @@
  * 01-Sep-2023    SP08SEP23     Rensi Arteaga          add base flow list
  * 16-Sep-2023    SP22SEP23     Mercedes Zambrana       Change GET to POST in insertEventFlow
  * 28-Sep-2023    SP06OCT23     Mercedes Zambrana      Add Validation when change off status (validateFlow, deleteflow, saveFlow, saveflowName)
+ * 07-Feb-2025    8353064698    Mercedes Zambrana      Add validation for opt in page when flow si funnel change
  * ******************************************************************************
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -66,6 +67,7 @@ const Flow_1 = __importDefault(require("../entity/Flow"));
 const FlowInstance_1 = __importDefault(require("../entity/FlowInstance"));
 const NodeInstance_1 = __importDefault(require("../entity/NodeInstance"));
 const Node_2 = __importDefault(require("./Node"));
+const axios_1 = __importDefault(require("axios"));
 //import {configFacebookStrategy} from "./passport-facebook";
 let Flow = class Flow extends core_1.Controller {
     async get(params) {
@@ -217,14 +219,11 @@ let Flow = class Flow extends core_1.Controller {
             let flowDataClone;
             //if we have a vendoId as parameter the origin is a template
             if (params.vendorId) {
-                console.log("con vendor:", flowToClone);
                 flowDataClone = await manager.save(Flow_1.default, { ...flowToClone, name: `${params.name}`, vendorId: params.vendorId, type: 'custom' });
             }
             else {
-                console.log("sin vendore:", flowToClone);
                 flowDataClone = await manager.save(Flow_1.default, { ...flowToClone, name: `${flowData.name} Copy` });
             }
-            console.log("el clonado:::", flowDataClone);
             const dataNode = await Node_1.default.findOne({ where: { flowId: params.flowId, isInit: 'Y', isActive: true }, order: { nodeId: "ASC" } });
             dataNode && await this.copyNode(dataNode, flowDataClone.flowId, manager, true);
             return { success: true, flowId: flowDataClone.flowId };
@@ -234,6 +233,7 @@ let Flow = class Flow extends core_1.Controller {
         }
     }
     async saveFlow(params, manager) {
+        var _a, _b;
         let nodeRefIds = params.board.columns['2-column-nodes-configured'].taskIds;
         let nodes = params.board.tasks ? params.board.tasks : [];
         let masterId = null;
@@ -325,6 +325,31 @@ let Flow = class Flow extends core_1.Controller {
                             await manager.query(dNode);
                         }
                     }
+                    if (flowIdDel.action.actionType.name === 'CHAINED FLOW') {
+                        if (((_a = flowIdDel.action) === null || _a === void 0 ? void 0 : _a.configJsonTemplate) && flowIdDel.actionConfigJson) {
+                            try {
+                                const parsedConfig = JSON.parse(flowIdDel.action.configJsonTemplate);
+                                const parsedValues = JSON.parse(flowIdDel.actionConfigJson);
+                                if (parsedConfig.deleteController && parsedValues.flowId) {
+                                    const params = {
+                                        flowId: parsedValues.flowId,
+                                    };
+                                    const config = {
+                                        method: "post",
+                                        url: `http://localhost:${process.env.PORT}/api/${parsedConfig.addController}`,
+                                        headers: {
+                                            Authorization: "" + process.env.TOKEN_PXP_ND + "",
+                                            "Content-Type": "application/json",
+                                        },
+                                        data: params,
+                                    };
+                                }
+                            }
+                            catch (error) {
+                                console.error("Not valid json", error);
+                            }
+                        }
+                    }
                 }
                 else {
                     throw new core_1.PxpError(400, 'Please turn off the flow before make a change');
@@ -350,6 +375,38 @@ let Flow = class Flow extends core_1.Controller {
                         const saveNode = await manager.save(newNode);
                         id = saveNode.nodeId;
                         newId = saveNode.nodeId;
+                        if (newAction.actionType.name === 'CHAINED FLOW') {
+                            if (newAction === null || newAction === void 0 ? void 0 : newAction.configJsonTemplate) {
+                                try {
+                                    const parsedConfig = JSON.parse(newAction.configJsonTemplate);
+                                    if (parsedConfig.addController && parsedConfig.template) {
+                                        const params = {
+                                            template: parsedConfig.template,
+                                            flowId,
+                                        };
+                                        const config = {
+                                            method: "post",
+                                            url: `http://localhost:${process.env.PORT}/api/${parsedConfig.addController}`,
+                                            headers: {
+                                                Authorization: "" + process.env.TOKEN_PXP_ND + "",
+                                                "Content-Type": "application/json",
+                                            },
+                                            data: params,
+                                        };
+                                        const resControllerAxios = await (0, axios_1.default)(config);
+                                        const chainedFlowId = (_b = resControllerAxios.data) === null || _b === void 0 ? void 0 : _b.flowId;
+                                        const parsedValues = {
+                                            flowId: chainedFlowId
+                                        };
+                                        saveNode.actionConfigJson = JSON.stringify(parsedValues);
+                                        await manager.save(saveNode);
+                                    }
+                                }
+                                catch (error) {
+                                    console.error("Not valid json", error);
+                                }
+                            }
+                        }
                     }
                     else {
                         id = nodeId;
@@ -399,13 +456,12 @@ let Flow = class Flow extends core_1.Controller {
         else {
             const oName = (_a = totalNodes === null || totalNodes === void 0 ? void 0 : totalNodes.action) === null || _a === void 0 ? void 0 : _a.originName;
             if (flow.templateType == 'funnel') {
-                cond = `and (at.name ='PAGE') and (a.originName is null or a.originName = '${oName}')`;
+                cond = `and (at.name ='PAGE' || at.name = 'CHAINED FLOW') and (a.originName is null or a.originName = '${oName}')`;
             }
             else {
-                cond = `and (at.name != 'EVENT' and at.name!='PAGE') and (a.originName is null or a.originName = '${oName}')`;
+                cond = `and (at.name != 'EVENT' and at.name!='PAGE' and at.name!='CHAINED FLOW') and (a.originName is null or a.originName = '${oName}')`;
             }
         }
-        console.log("condicion es:", cond);
         let actions = await (0, typeorm_1.getManager)()
             .createQueryBuilder(Action_1.default, "a")
             .select([
@@ -419,7 +475,6 @@ let Flow = class Flow extends core_1.Controller {
             .innerJoin("a.actionType", "at")
             .where(`a.isActive = 1 and a.hidden = 'N'` + cond)
             .getMany();
-        console.log("actions:", actions);
         const connections = await (0, typeorm_1.getManager)()
             .createQueryBuilder(NodeConnection_1.default, "nc")
             .select([

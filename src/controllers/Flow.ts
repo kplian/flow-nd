@@ -417,7 +417,7 @@ class Flow extends Controller {
                     const params = {
                       flowId: parsedValues.flowId,
                     }
-                    const config = {
+                    const config: AxiosRequestConfig = {
                       method: "post",
                       url: `http://localhost:${process.env.PORT}/api/${parsedConfig.addController}`,
                       headers: {
@@ -426,6 +426,8 @@ class Flow extends Controller {
                       },
                       data: params,
                     };
+
+                    const resControllerAxios = await axios(config);
                   }
                 } catch (error) {
                   console.error("Not valid json", error);

@@ -336,7 +336,7 @@ let Flow = class Flow extends core_1.Controller {
                                     };
                                     const config = {
                                         method: "post",
-                                        url: `http://localhost:${process.env.PORT}/api/${parsedConfig.addController}`,
+                                        url: `http://localhost:${process.env.PORT}/api/${parsedConfig.deleteController}`,
                                         headers: {
                                             Authorization: "" + process.env.TOKEN_PXP_ND + "",
                                             "Content-Type": "application/json",
@@ -344,6 +344,7 @@ let Flow = class Flow extends core_1.Controller {
                                         data: params,
                                     };
                                     const resControllerAxios = await (0, axios_1.default)(config);
+                                    console.log('resControllerAxios.data', resControllerAxios.data);
                                 }
                             }
                             catch (error) {

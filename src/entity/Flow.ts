@@ -11,6 +11,7 @@
  * 04-Sep-2023      SP08SEP23       Rensi Arteaga       add modified at and by
  * 06-Dec-2024		8001237262		Mercedes Zambrana	add flow_type
  * 31-Jan-2025		8035304698		Mercedes Zambrana	Change code to string
+ * 11-Feb-2025		8353091310		Merecedes Zambrana	Add isActive
  ****************************************************************************/
 import {
 	OneToMany,
@@ -72,5 +73,8 @@ export default class Flow extends PxpEntity{
 
 	@Column({ name: 'flow_type', type: 'varchar', nullable: true, length: 100 })
 	flowType:string;
+
+	@Column({ name: 'is_active', type: 'int', nullable: false })
+	isActiveFlow:number;
 
 }

@@ -407,16 +407,20 @@ class Flow extends Controller {
             }
 
             if (flowIdDel.action.actionType.name === 'CHAINED FLOW') {
+              console.log('CHAINED');
               if (flowIdDel.action?.configJsonTemplate && flowIdDel.actionConfigJson) {
                 try {
                   const parsedConfig = JSON.parse(flowIdDel.action.configJsonTemplate);
                   const parsedValues = JSON.parse(flowIdDel.actionConfigJson);
                   
-                  
+                  console.log('parsedConfig', parsedConfig);
+                  console.log('parsedValues', parsedValues);
                   if (parsedConfig.deleteController && parsedValues.flowId) {
                     const params = {
                       flowId: parsedValues.flowId,
                     }
+
+                    console.log('params', params);
                     const config: AxiosRequestConfig = {
                       method: "post",
                       url: `http://localhost:${process.env.PORT}/api/${parsedConfig.addController}`,
@@ -426,6 +430,8 @@ class Flow extends Controller {
                       },
                       data: params,
                     };
+
+                    console.log('config', config);
 
                     const resControllerAxios = await axios(config);
                   }

@@ -1105,6 +1105,173 @@ class Flow extends Controller {
     }
 
 
+@Get("")
+@DbSettings("Orm")
+@ReadOnly(true)
+@Log(true)
+async listTemplates(params: Record<string, any>): Promise<unknown> {
+  const isActive = params._isActive;
+  const type = params._type || "template"; // Filtrar solo templates
+  const vendorIds = params._vendorId ? params._vendorId.split(",").map(Number) : [];
+  const templateType = params._templateType;
+  const allowedColumns = ["name", "description"];
+  const filter = params?.filter ? JSON.parse(params?.filter) : null;
+  const filters = filter?.items || [];
+  const logicOperator = filter?.logicOperator?.toUpperCase() || "AND";
+
+  const queryBuilder: any = await getManager()
+    .createQueryBuilder()
+    .select([
+      "f.flow_id as flowId",
+      "f.vendor_id as vendorId",
+      "f.code as code",
+      "f.name as name",
+      "f.enabled as enabled",
+      "f.type as type",
+      "f.created_by as createdBy",
+      "f.user_id_ai as userIdAi",
+      "f.user_ai as userAi",
+      "f.modified_by as modifiedBy",
+      "f.created_at as createdAt",
+      "f.modified_at as modifiedAt",
+      "f.is_active as isActive",
+      "f.description as description",
+      "f.icon as icon",
+      "f.status as status",
+      "COUNT(fi.flow_instance_id) AS numberOfInstance",
+    ])
+    .from("twf_flow", "f")
+    .leftJoin("twf_flow_instance", "fi", "fi.flow_id = f.flow_id");
+
+// Aplicar filtros
+if (isActive !== undefined) {
+  queryBuilder.where("f.is_active = :isActive", { isActive });
+}
+if (type) {
+  queryBuilder.andWhere("f.type = :type", { type });
+}
+if (templateType) {
+  queryBuilder.andWhere("f.template_type = :templateType", { templateType });
+}
+if (vendorIds.length > 0) {
+  queryBuilder.andWhere("f.vendor_id IN (:...vendorIds)", { vendorIds });
+}
+if (allowedColumns.includes(params.genericFilterFields)) {
+  if (params.genericFilterFields && params.genericFilterValue) {
+    queryBuilder.andWhere(`f.${params.genericFilterFields} LIKE :genericFilterValue`, {
+      genericFilterValue: `%${params.genericFilterValue}%`,
+    });
+  }
+}
+  const applyDynamicFilters = (queryBuilder: any, filters: any[], logicOperator: string) => {
+    filters.forEach((filter: any, index: number) => {
+      const { field, operator, value } = filter;
+      const queryField = `f.${field}`;
+      const parameterName = `filterValue${index}`;
+      let condition: string;
+
+      switch (operator) {
+        case 'contains':
+          condition = `${queryField} LIKE :${parameterName}`;
+          queryBuilder.setParameter(parameterName, `%${value}%`);
+          break;
+        case 'equals':
+          condition = `${queryField} = :${parameterName}`;
+          queryBuilder.setParameter(parameterName, value);
+          break;
+        case 'startsWith':
+          condition = `${queryField} LIKE :${parameterName}`;
+          queryBuilder.setParameter(parameterName, `${value}%`);
+          break;
+        case 'endsWith':
+          condition = `${queryField} LIKE :${parameterName}`;
+          queryBuilder.setParameter(parameterName, `%${value}`);
+          break;
+        case 'isEmpty':
+          condition = `${queryField} IS NULL OR ${queryField} = ''`;
+          break;
+        case 'isNotEmpty':
+          condition = `${queryField} IS NOT NULL AND ${queryField} <> ''`;
+          break;
+        case 'isAnyOf':
+          condition = `${queryField} IN (:...${parameterName})`;
+          queryBuilder.setParameter(parameterName, value.split(','));
+          break;
+        default:
+          throw new Error(`Operator ${operator} is not supported.`);
+      }
+
+      if (index === 0) {
+        queryBuilder.andWhere(condition);
+      } else {
+        queryBuilder[logicOperator === 'OR' ? 'orWhere' : 'andWhere'](condition);
+      }
+    });
+  };
+// Aplicar filtros dinámicos
+applyDynamicFilters(queryBuilder, filters, logicOperator);
+
+queryBuilder.groupBy([
+  "f.flow_id",
+  "f.vendor_id",
+  "f.code",
+  "f.name",
+  "f.enabled",
+  "f.type",
+  "f.created_by",
+  "f.user_id_ai",
+  "f.user_ai",
+  "f.modified_by",
+  "f.created_at",
+  "f.modified_at",
+  "f.is_active",
+  "f.description",
+  "f.icon",
+  "f.status",
+]);
+
+// Ordenamiento y paginación
+queryBuilder.orderBy(`f.${params.sort || "flowId"}`, params.dir || "ASC");
+queryBuilder.limit(params.limit || 50).offset(params.start || 0);
+
+// Obtener los datos
+const data = await queryBuilder.getRawMany();
+
+// Query para contar registros
+const countQuery = await getManager()
+    .createQueryBuilder()
+    .select("COUNT(f.flow_id)", "count")
+    .from("twf_flow", "f");
+
+if (isActive !== undefined) {
+  countQuery.where("f.is_active = :isActive", { isActive });
+}
+if (type) {
+  countQuery.andWhere("f.type = :type", { type });
+}
+if (templateType) {
+  countQuery.andWhere("f.template_type = :templateType", { templateType });
+}
+if (vendorIds.length > 0) {
+  countQuery.andWhere("f.vendor_id IN (:...vendorIds)", { vendorIds });
+}
+if (allowedColumns.includes(params.genericFilterFields)) {
+  if (params.genericFilterFields && params.genericFilterValue) {
+    countQuery.andWhere(`f.${params.genericFilterFields} LIKE :genericFilterValue`, {
+      genericFilterValue: `%${params.genericFilterValue}%`,
+    });
+  }
+}
+
+// Aplicar filtros dinámicos en el conteo
+applyDynamicFilters(countQuery, filters, logicOperator);
+
+const totalCount = await countQuery.getRawOne();
+return { data, count: totalCount.count };
+}
+
+
+
 }
 
 export default Flow;

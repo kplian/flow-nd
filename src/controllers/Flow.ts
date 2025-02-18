@@ -18,6 +18,7 @@
  * 16-Sep-2023    SP22SEP23     Mercedes Zambrana       Change GET to POST in insertEventFlow
  * 28-Sep-2023    SP06OCT23     Mercedes Zambrana      Add Validation when change off status (validateFlow, deleteflow, saveFlow, saveflowName)
  * 07-Feb-2025    8353064698    Mercedes Zambrana      Add validation for opt in page when flow si funnel change
+ * 18-Feb-2025    8501163144    Mercedes Zambrana      Add publish filter
  * ******************************************************************************
  */
 
@@ -1118,7 +1119,7 @@ async listTemplates(params: Record<string, any>): Promise<unknown> {
   const filter = params?.filter ? JSON.parse(params?.filter) : null;
   const filters = filter?.items || [];
   const logicOperator = filter?.logicOperator?.toUpperCase() || "AND";
-
+  const publish = params._publish;
   const queryBuilder: any = await getManager()
     .createQueryBuilder()
     .select([
@@ -1147,6 +1148,12 @@ async listTemplates(params: Record<string, any>): Promise<unknown> {
 if (isActive !== undefined) {
   queryBuilder.where("f.is_active = :isActive", { isActive });
 }
+
+  if (publish !== undefined) {
+    queryBuilder.where("f.publish = :publish", { publish });
+  }
+
+
 if (type) {
   queryBuilder.andWhere("f.type = :type", { type });
 }
@@ -1246,6 +1253,10 @@ const countQuery = await getManager()
 if (isActive !== undefined) {
   countQuery.where("f.is_active = :isActive", { isActive });
 }
+  if (publish !== undefined) {
+    countQuery.where("f.publish = :publish", { publish });
+  }
+
 if (type) {
   countQuery.andWhere("f.type = :type", { type });
 }
@@ -1269,6 +1280,53 @@ applyDynamicFilters(countQuery, filters, logicOperator);
 const totalCount = await countQuery.getRawOne();
 return { data, count: totalCount.count };
 }
+
+
+
+  @Post()
+  @DbSettings('Orm')
+  @ReadOnly(false)
+  @Log(true)
+  async changePublishTemplate(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+
+    let dataFlow = await __(FlowModel.findOne(params.flowId));
+
+    if (dataFlow){
+      console.log ("publish es:::::::::",dataFlow.publish);
+      if (dataFlow.publish ==='N' ){
+        await this.validatePublishTemplate(params.flowId as number, manager, 'Y' );
+        //change to active
+        dataFlow.publish = 'Y';
+      }else {
+        await this.validatePublishTemplate(params.flowId as number, manager, 'N' );
+        dataFlow.publish = 'N';
+      }
+
+      dataFlow.modifiedAt = new Date();
+      dataFlow.modifiedBy = this.user.username
+
+      const updFlow = await __(manager.save(dataFlow));
+      return {success : true}
+    }else{
+      return { success : false }
+    }
+
+  }
+
+
+  async validatePublishTemplate(flowId: number, manager: EntityManager, publish: string): Promise<unknown> {
+    if (publish == 'Y'){
+      const nodes = await NodeModel.find({ flowId, isActive: true });
+      let res = '';
+      if (nodes.length < 2) {
+        throw new PxpError(400, 'Your template must have at least 2 steps. Please finish configuring it before publish');
+      }
+      return true;
+    }else{
+      return true;
+    }
+  }
+
 
 
 

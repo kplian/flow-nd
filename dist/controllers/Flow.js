@@ -19,6 +19,7 @@
  * 16-Sep-2023    SP22SEP23     Mercedes Zambrana       Change GET to POST in insertEventFlow
  * 28-Sep-2023    SP06OCT23     Mercedes Zambrana      Add Validation when change off status (validateFlow, deleteflow, saveFlow, saveflowName)
  * 07-Feb-2025    8353064698    Mercedes Zambrana      Add validation for opt in page when flow si funnel change
+ * 18-Feb-2025    8501163144    Mercedes Zambrana      Add publish filter
  * ******************************************************************************
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -883,6 +884,7 @@ let Flow = class Flow extends core_1.Controller {
         const filter = (params === null || params === void 0 ? void 0 : params.filter) ? JSON.parse(params === null || params === void 0 ? void 0 : params.filter) : null;
         const filters = (filter === null || filter === void 0 ? void 0 : filter.items) || [];
         const logicOperator = ((_a = filter === null || filter === void 0 ? void 0 : filter.logicOperator) === null || _a === void 0 ? void 0 : _a.toUpperCase()) || "AND";
+        const publish = params._publish;
         const queryBuilder = await (0, typeorm_1.getManager)()
             .createQueryBuilder()
             .select([
@@ -909,6 +911,9 @@ let Flow = class Flow extends core_1.Controller {
         // Aplicar filtros
         if (isActive !== undefined) {
             queryBuilder.where("f.is_active = :isActive", { isActive });
+        }
+        if (publish !== undefined) {
+            queryBuilder.where("f.publish = :publish", { publish });
         }
         if (type) {
             queryBuilder.andWhere("f.type = :type", { type });
@@ -1003,6 +1008,9 @@ let Flow = class Flow extends core_1.Controller {
         if (isActive !== undefined) {
             countQuery.where("f.is_active = :isActive", { isActive });
         }
+        if (publish !== undefined) {
+            countQuery.where("f.publish = :publish", { publish });
+        }
         if (type) {
             countQuery.andWhere("f.type = :type", { type });
         }
@@ -1023,6 +1031,41 @@ let Flow = class Flow extends core_1.Controller {
         applyDynamicFilters(countQuery, filters, logicOperator);
         const totalCount = await countQuery.getRawOne();
         return { data, count: totalCount.count };
+    }
+    async changePublishTemplate(params, manager) {
+        let dataFlow = await (0, core_1.__)(Flow_1.default.findOne(params.flowId));
+        if (dataFlow) {
+            console.log("publish es:::::::::", dataFlow.publish);
+            if (dataFlow.publish === 'N') {
+                await this.validatePublishTemplate(params.flowId, manager, 'Y');
+                //change to active
+                dataFlow.publish = 'Y';
+            }
+            else {
+                await this.validatePublishTemplate(params.flowId, manager, 'N');
+                dataFlow.publish = 'N';
+            }
+            dataFlow.modifiedAt = new Date();
+            dataFlow.modifiedBy = this.user.username;
+            const updFlow = await (0, core_1.__)(manager.save(dataFlow));
+            return { success: true };
+        }
+        else {
+            return { success: false };
+        }
+    }
+    async validatePublishTemplate(flowId, manager, publish) {
+        if (publish == 'Y') {
+            const nodes = await Node_1.default.find({ flowId, isActive: true });
+            let res = '';
+            if (nodes.length < 2) {
+                throw new core_1.PxpError(400, 'Your template must have at least 2 steps. Please finish configuring it before publish');
+            }
+            return true;
+        }
+        else {
+            return true;
+        }
     }
 };
 __decorate([
@@ -1134,6 +1177,15 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], Flow.prototype, "listTemplates", null);
+__decorate([
+    (0, core_1.Post)(),
+    (0, core_1.DbSettings)('Orm'),
+    (0, core_1.ReadOnly)(false),
+    (0, core_1.Log)(true),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
+    __metadata("design:returntype", Promise)
+], Flow.prototype, "changePublishTemplate", null);
 Flow = __decorate([
     (0, core_1.Model)('flow-nd/Flow')
 ], Flow);

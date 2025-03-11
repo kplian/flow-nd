@@ -234,7 +234,7 @@ let Flow = class Flow extends core_1.Controller {
         }
     }
     async saveFlow(params, manager) {
-        var _a, _b;
+        var _a, _b, _c, _d;
         let nodeRefIds = params.board.columns['2-column-nodes-configured'].taskIds;
         let nodes = params.board.tasks ? params.board.tasks : [];
         let masterId = null;
@@ -349,7 +349,14 @@ let Flow = class Flow extends core_1.Controller {
                                 }
                             }
                             catch (error) {
-                                console.error("Not valid json", error);
+                                if (axios_1.default.isAxiosError(error) && error.response) {
+                                    const message = ((_c = (_b = error.response.data) === null || _b === void 0 ? void 0 : _b.error) === null || _c === void 0 ? void 0 : _c.message) || 'Unknown error';
+                                    throw new core_1.PxpError(400, message);
+                                }
+                                else {
+                                    console.error("Not valid json", error);
+                                    throw new core_1.PxpError(500, 'Unexpected error while processing the request');
+                                }
                             }
                         }
                     }
@@ -397,7 +404,7 @@ let Flow = class Flow extends core_1.Controller {
                                             data: params,
                                         };
                                         const resControllerAxios = await (0, axios_1.default)(config);
-                                        const chainedFlowId = (_b = resControllerAxios.data) === null || _b === void 0 ? void 0 : _b.flowId;
+                                        const chainedFlowId = (_d = resControllerAxios.data) === null || _d === void 0 ? void 0 : _d.flowId;
                                         const parsedValues = {
                                             flowId: chainedFlowId
                                         };

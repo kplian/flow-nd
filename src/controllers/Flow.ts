@@ -432,7 +432,13 @@ class Flow extends Controller {
                     console.log('resControllerAxios.data', resControllerAxios.data);
                   }
                 } catch (error) {
-                  console.error("Not valid json", error);
+                  if (axios.isAxiosError(error) && error.response) {
+                    const message = error.response.data?.error?.message || 'Unknown error';
+                    throw new PxpError(400, message);
+                  } else {
+                    console.error("Not valid json", error);
+                    throw new PxpError(500, 'Unexpected error while processing the request');
+                  }
                 }
               }
              }

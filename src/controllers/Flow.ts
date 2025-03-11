@@ -355,7 +355,7 @@ class Flow extends Controller {
 
 
 
-                 let flowNodeC = await getManager().query(`DELETE
+                 let flowNodeC = await manager.query(`DELETE
                                                        from twf_node_connection
                                                        WHERE node_connection_id = ${originalNodeCIds}`);
 

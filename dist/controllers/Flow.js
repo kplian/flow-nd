@@ -289,7 +289,7 @@ let Flow = class Flow extends core_1.Controller {
                         });
                         if (connectionsToDel) {
                             const originalNodeCIds = connectionsToDel.map((node) => node.nodeConnectionId);
-                            let flowNodeC = await (0, typeorm_1.getManager)().query(`DELETE
+                            let flowNodeC = await manager.query(`DELETE
                                                        from twf_node_connection
                                                        WHERE node_connection_id = ${originalNodeCIds}`);
                         }

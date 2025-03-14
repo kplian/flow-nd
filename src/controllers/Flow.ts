@@ -71,7 +71,7 @@ class Flow extends Controller {
     return restNodes;
   }
 
-  async copyNodeConnections(nodeId: number, newNodeId: number, newFlowId: number, manager: EntityManager) {
+  async copyNodeConnections(nodeId: number, newNodeId: number, newFlowId: number, manager: EntityManager, isCopy: boolean = false) {
     const connections = await __(NodeConnectionModel.find({ nodeIdMaster: nodeId, isActive: true }));
 
     for(let connection of connections) {
@@ -81,17 +81,50 @@ class Flow extends Controller {
       // get node from nodeIdChild
       const dataNodeChild = await NodeModel.findOne({ nodeId: connection.nodeIdChild });
 
-      const {nodeId: newNodeIdChild} = await this.copyNode(dataNodeChild, newFlowId, manager);
+      const {nodeId: newNodeIdChild} = await this.copyNode(dataNodeChild, newFlowId, manager, isCopy);
       Object.assign(newNodeConnection, {...nodeConnectionToCopy, nodeIdMaster: newNodeId, nodeIdChild:newNodeIdChild })
       const insertNewNodeConnection = await __(manager.save(NodeConnectionModel, newNodeConnection));
 
     }
   }
-  async copyNode(node: Record<any, any>, newFlowId: number, manager: EntityManager, isFirst: boolean = false) {
+  async copyNode(node: Record<any, any>, newFlowId: number, manager: EntityManager, isFirst: boolean = false, isCopy: boolean = false) {
 
     // insert new node
     const newNode = new NodeModel();
     const { nodeId, flowId, createdAt, modifiedAt, ...nodeToCopy } = node;
+    if (nodeToCopy?.action?.actionType?.onDuplicate === 'duplicateChainedFlow') {
+      if (nodeToCopy?.action?.configJsonTemplate) {
+        try {
+          const parsedConfig = JSON.parse(nodeToCopy.action.configJsonTemplate);
+          if (parsedConfig.addController && parsedConfig.template) {
+            const params = {
+              template: parsedConfig.template, 
+              flowId: newFlowId,
+            }
+            const config: AxiosRequestConfig = {
+              method: "post",
+              url: `http://localhost:${process.env.PORT}/api/${parsedConfig.addController}`,
+              headers: {
+                Authorization: "" + process.env.TOKEN_PXP_ND + "",
+                "Content-Type": "application/json",
+              },
+              data: params,
+            };
+            const resControllerAxios = await axios(config);
+            const chainedFlowId = resControllerAxios.data?.flowId;
+            
+            const parsedValues = {
+              flowId: chainedFlowId
+            }
+
+            const newConfigJson = JSON.stringify(parsedValues);
+            nodeToCopy.actionConfigJson = newConfigJson;
+          }
+        } catch (error) {
+          console.error("Not valid json", error);
+        }
+    }
+    }
     Object.assign(newNode, { ...nodeToCopy, flowId: newFlowId });
     const insertNewNode = await __(manager.save(NodeModel, newNode));
     if (isFirst) {
@@ -103,7 +136,7 @@ class Flow extends Controller {
       await manager.save(duplicatedConnection);
     }
     // insert connection
-    await this.copyNodeConnections(node.nodeId, insertNewNode.nodeId, newFlowId, manager);
+    await this.copyNodeConnections(node.nodeId, insertNewNode.nodeId, newFlowId, manager, isCopy);
 
     return {nodeId: insertNewNode.nodeId};
 
@@ -249,16 +282,19 @@ class Flow extends Controller {
       }
 
       let flowDataClone:any
+      let isCopy = false;
 
        //if we have a vendoId as parameter the origin is a template
       if(params.vendorId) {
          flowDataClone = await manager.save(FlowModel, {...flowToClone, name: `${params.name}`, vendorId: params.vendorId, type: 'custom'});
       } else {
          flowDataClone = await manager.save(FlowModel, {...flowToClone, name: `${flowData.name} Copy`});
+         isCopy = true;
       }
 
       const dataNode = await NodeModel.findOne({ where: {flowId: params.flowId, isInit: 'Y', isActive: true }, order: {nodeId: "ASC"}});
-      dataNode && await this.copyNode(dataNode, flowDataClone.flowId, manager, true);
+      dataNode && await this.copyNode(dataNode, flowDataClone.flowId, manager, true, isCopy);
+      
       return { success:true, flowId: flowDataClone.flowId }
     }else{
       return { success:false, "respuesta": "No Flow" }
@@ -903,7 +939,7 @@ class Flow extends Controller {
                    const queryBuilder: SelectQueryBuilder<NodeInstanceModel> = transactionalEntityManager.createQueryBuilder(NodeInstanceModel, 'node_instance');
                    queryBuilder
                       .where('node_instance.flowInstanceId = :flowInstanceId', { flowInstanceId })
-                      .andWhere('((node_instance.status IS NULL AND node_instance.schedule = :schedule) OR (node_instance.status = :status AND node_instance.schedule != :schedule))', {
+                      .andWhere('((node_instance.status IS NULL AND (node_instance.schedule = :schedule OR node_instance.schedule IS NULL)) OR (node_instance.status = :status AND node_instance.schedule != :schedule AND node_instance.schedule IS NOT NULL))', {
                         status: 'executed',
                         schedule: '0000-00-00 00:00:00',
                       });

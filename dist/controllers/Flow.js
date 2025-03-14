@@ -111,7 +111,7 @@ let Flow = class Flow extends core_1.Controller {
         // insert new node
         const newNode = new Node_1.default();
         const { nodeId, flowId, createdAt, modifiedAt, ...nodeToCopy } = node;
-        if (((_b = (_a = nodeToCopy === null || nodeToCopy === void 0 ? void 0 : nodeToCopy.action) === null || _a === void 0 ? void 0 : _a.actionType) === null || _b === void 0 ? void 0 : _b.onDuplicate) === 'duplicateChainedFlow') {
+        if (isCopy && ((_b = (_a = nodeToCopy === null || nodeToCopy === void 0 ? void 0 : nodeToCopy.action) === null || _a === void 0 ? void 0 : _a.actionType) === null || _b === void 0 ? void 0 : _b.onDuplicate) === 'duplicateChainedFlow') {
             if ((_c = nodeToCopy === null || nodeToCopy === void 0 ? void 0 : nodeToCopy.action) === null || _c === void 0 ? void 0 : _c.configJsonTemplate) {
                 try {
                     const parsedConfig = JSON.parse(nodeToCopy.action.configJsonTemplate);
@@ -254,10 +254,10 @@ let Flow = class Flow extends core_1.Controller {
             let isCopy = false;
             //if we have a vendoId as parameter the origin is a template
             if (params.vendorId) {
-                flowDataClone = await manager.save(Flow_1.default, { ...flowToClone, name: `${params.name}`, vendorId: params.vendorId, type: 'custom' });
+                flowDataClone = await (0, typeorm_1.getManager)().save(Flow_1.default, { ...flowToClone, name: `${params.name}`, vendorId: params.vendorId, type: 'custom' });
             }
             else {
-                flowDataClone = await manager.save(Flow_1.default, { ...flowToClone, name: `${flowData.name} Copy` });
+                flowDataClone = await (0, typeorm_1.getManager)().save(Flow_1.default, { ...flowToClone, name: `${flowData.name} Copy` });
                 isCopy = true;
             }
             const dataNode = await Node_1.default.findOne({ where: { flowId: params.flowId, isInit: 'Y', isActive: true }, order: { nodeId: "ASC" } });

@@ -92,7 +92,7 @@ class Flow extends Controller {
     // insert new node
     const newNode = new NodeModel();
     const { nodeId, flowId, createdAt, modifiedAt, ...nodeToCopy } = node;
-    if (nodeToCopy?.action?.actionType?.onDuplicate === 'duplicateChainedFlow') {
+    if (isCopy && nodeToCopy?.action?.actionType?.onDuplicate === 'duplicateChainedFlow') {
       if (nodeToCopy?.action?.configJsonTemplate) {
         try {
           const parsedConfig = JSON.parse(nodeToCopy.action.configJsonTemplate);
@@ -286,9 +286,9 @@ class Flow extends Controller {
 
        //if we have a vendoId as parameter the origin is a template
       if(params.vendorId) {
-         flowDataClone = await manager.save(FlowModel, {...flowToClone, name: `${params.name}`, vendorId: params.vendorId, type: 'custom'});
+         flowDataClone = await getManager().save(FlowModel, {...flowToClone, name: `${params.name}`, vendorId: params.vendorId, type: 'custom'});
       } else {
-         flowDataClone = await manager.save(FlowModel, {...flowToClone, name: `${flowData.name} Copy`});
+         flowDataClone = await getManager().save(FlowModel, {...flowToClone, name: `${flowData.name} Copy`});
          isCopy = true;
       }
 

@@ -59,6 +59,9 @@ export default class ActionType extends PxpEntity{
   @Column({ name: 'actions_json', type: 'text' })
   actionsJson: string;
 
+  @Column({ name: 'on_duplicate', type: 'varchar' })
+  onDuplicate: string;
+
   @Column({ name: 'validation_controller', type: 'text' })
   validationController: string;
 

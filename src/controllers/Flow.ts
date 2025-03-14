@@ -81,7 +81,7 @@ class Flow extends Controller {
       // get node from nodeIdChild
       const dataNodeChild = await NodeModel.findOne({ nodeId: connection.nodeIdChild });
 
-      const {nodeId: newNodeIdChild} = await this.copyNode(dataNodeChild, newFlowId, manager, isCopy);
+      const {nodeId: newNodeIdChild} = await this.copyNode(dataNodeChild, newFlowId, manager, false, isCopy);
       Object.assign(newNodeConnection, {...nodeConnectionToCopy, nodeIdMaster: newNodeId, nodeIdChild:newNodeIdChild })
       const insertNewNodeConnection = await __(manager.save(NodeConnectionModel, newNodeConnection));
 

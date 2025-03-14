@@ -94,22 +94,55 @@ let Flow = class Flow extends core_1.Controller {
         }
         return restNodes;
     }
-    async copyNodeConnections(nodeId, newNodeId, newFlowId, manager) {
+    async copyNodeConnections(nodeId, newNodeId, newFlowId, manager, isCopy = false) {
         const connections = await (0, core_1.__)(NodeConnection_1.default.find({ nodeIdMaster: nodeId, isActive: true }));
         for (let connection of connections) {
             const newNodeConnection = new NodeConnection_1.default();
             const { nodeConnectionId, nodeIdMaster, nodeIdChild, createdAt, modifiedAt, ...nodeConnectionToCopy } = connection;
             // get node from nodeIdChild
             const dataNodeChild = await Node_1.default.findOne({ nodeId: connection.nodeIdChild });
-            const { nodeId: newNodeIdChild } = await this.copyNode(dataNodeChild, newFlowId, manager);
+            const { nodeId: newNodeIdChild } = await this.copyNode(dataNodeChild, newFlowId, manager, isCopy);
             Object.assign(newNodeConnection, { ...nodeConnectionToCopy, nodeIdMaster: newNodeId, nodeIdChild: newNodeIdChild });
             const insertNewNodeConnection = await (0, core_1.__)(manager.save(NodeConnection_1.default, newNodeConnection));
         }
     }
-    async copyNode(node, newFlowId, manager, isFirst = false) {
+    async copyNode(node, newFlowId, manager, isFirst = false, isCopy = false) {
+        var _a, _b, _c, _d;
         // insert new node
         const newNode = new Node_1.default();
         const { nodeId, flowId, createdAt, modifiedAt, ...nodeToCopy } = node;
+        if (((_b = (_a = nodeToCopy === null || nodeToCopy === void 0 ? void 0 : nodeToCopy.action) === null || _a === void 0 ? void 0 : _a.actionType) === null || _b === void 0 ? void 0 : _b.onDuplicate) === 'duplicateChainedFlow') {
+            if ((_c = nodeToCopy === null || nodeToCopy === void 0 ? void 0 : nodeToCopy.action) === null || _c === void 0 ? void 0 : _c.configJsonTemplate) {
+                try {
+                    const parsedConfig = JSON.parse(nodeToCopy.action.configJsonTemplate);
+                    if (parsedConfig.addController && parsedConfig.template) {
+                        const params = {
+                            template: parsedConfig.template,
+                            flowId: newFlowId,
+                        };
+                        const config = {
+                            method: "post",
+                            url: `http://localhost:${process.env.PORT}/api/${parsedConfig.addController}`,
+                            headers: {
+                                Authorization: "" + process.env.TOKEN_PXP_ND + "",
+                                "Content-Type": "application/json",
+                            },
+                            data: params,
+                        };
+                        const resControllerAxios = await (0, axios_1.default)(config);
+                        const chainedFlowId = (_d = resControllerAxios.data) === null || _d === void 0 ? void 0 : _d.flowId;
+                        const parsedValues = {
+                            flowId: chainedFlowId
+                        };
+                        const newConfigJson = JSON.stringify(parsedValues);
+                        nodeToCopy.actionConfigJson = newConfigJson;
+                    }
+                }
+                catch (error) {
+                    console.error("Not valid json", error);
+                }
+            }
+        }
         Object.assign(newNode, { ...nodeToCopy, flowId: newFlowId });
         const insertNewNode = await (0, core_1.__)(manager.save(Node_1.default, newNode));
         if (isFirst) {
@@ -121,7 +154,7 @@ let Flow = class Flow extends core_1.Controller {
             await manager.save(duplicatedConnection);
         }
         // insert connection
-        await this.copyNodeConnections(node.nodeId, insertNewNode.nodeId, newFlowId, manager);
+        await this.copyNodeConnections(node.nodeId, insertNewNode.nodeId, newFlowId, manager, isCopy);
         return { nodeId: insertNewNode.nodeId };
     }
     async createFlowFromFlow(params, manager) {
@@ -218,15 +251,17 @@ let Flow = class Flow extends core_1.Controller {
                 status: 'off'
             };
             let flowDataClone;
+            let isCopy = false;
             //if we have a vendoId as parameter the origin is a template
             if (params.vendorId) {
                 flowDataClone = await manager.save(Flow_1.default, { ...flowToClone, name: `${params.name}`, vendorId: params.vendorId, type: 'custom' });
             }
             else {
                 flowDataClone = await manager.save(Flow_1.default, { ...flowToClone, name: `${flowData.name} Copy` });
+                isCopy = true;
             }
             const dataNode = await Node_1.default.findOne({ where: { flowId: params.flowId, isInit: 'Y', isActive: true }, order: { nodeId: "ASC" } });
-            dataNode && await this.copyNode(dataNode, flowDataClone.flowId, manager, true);
+            dataNode && await this.copyNode(dataNode, flowDataClone.flowId, manager, true, isCopy);
             return { success: true, flowId: flowDataClone.flowId };
         }
         else {
@@ -719,7 +754,7 @@ let Flow = class Flow extends core_1.Controller {
                         const queryBuilder = transactionalEntityManager.createQueryBuilder(NodeInstance_1.default, 'node_instance');
                         queryBuilder
                             .where('node_instance.flowInstanceId = :flowInstanceId', { flowInstanceId })
-                            .andWhere('((node_instance.status IS NULL AND node_instance.schedule = :schedule) OR (node_instance.status = :status AND node_instance.schedule != :schedule))', {
+                            .andWhere('((node_instance.status IS NULL AND (node_instance.schedule = :schedule OR node_instance.schedule IS NULL)) OR (node_instance.status = :status AND node_instance.schedule != :schedule AND node_instance.schedule IS NOT NULL))', {
                             status: 'executed',
                             schedule: '0000-00-00 00:00:00',
                         });

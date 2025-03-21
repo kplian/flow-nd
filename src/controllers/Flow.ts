@@ -284,12 +284,11 @@ class Flow extends Controller {
       let flowDataClone:any
       let isCopy = false;
 
-       //if we have a vendoId as parameter the origin is a template
-      if(params.vendorId) {
+       //if we have a name as parameter the origin is a template
+      if(params.name) {
          flowDataClone = await getManager().save(FlowModel, {...flowToClone, name: `${params.name}`, vendorId: params.vendorId, type: 'custom'});
       } else {
          flowDataClone = await getManager().save(FlowModel, {...flowToClone, name: `${flowData.name} Copy`});
-         isCopy = true;
       }
 
       const dataNode = await NodeModel.findOne({ where: {flowId: params.flowId, isInit: 'Y', isActive: true }, order: {nodeId: "ASC"}});

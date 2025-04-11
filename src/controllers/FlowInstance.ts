@@ -163,6 +163,26 @@ class FlowInstance extends Controller {
     }
     return res;
   }
+
+  @Post()
+  @DbSettings('Orm')
+  @ReadOnly(false)
+  @Log(true)
+  async insert(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+    const { flowId, dataId, status, actionId, originName = '', originKey = '' } = params; 
+    let flowInstance = new FlowInstanceModel();
+    flowInstance.flowId = flowId;
+    flowInstance.dataId = dataId;
+    flowInstance.originName = originName;
+    flowInstance.originKey = originKey;
+    flowInstance.actionId = actionId;
+    flowInstance.status = status;
+    flowInstance = await manager.save(
+      FlowInstanceModel,
+      flowInstance
+    );
+    return flowInstance;
+  }
 }
 
 export default FlowInstance;

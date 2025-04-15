@@ -66,7 +66,6 @@ const Action_1 = __importDefault(require("../entity/Action"));
 const NodeConnection_1 = __importDefault(require("../entity/NodeConnection"));
 const Flow_1 = __importDefault(require("../entity/Flow"));
 const FlowInstance_1 = __importDefault(require("../entity/FlowInstance"));
-const NodeInstance_1 = __importDefault(require("../entity/NodeInstance"));
 const Node_2 = __importDefault(require("./Node"));
 const axios_1 = __importDefault(require("axios"));
 //import {configFacebookStrategy} from "./passport-facebook";
@@ -747,21 +746,25 @@ let Flow = class Flow extends core_1.Controller {
                     validFlowInstances.push(flowInstance.flowInstanceId);
                 }
                 else {
+                    /*Commented because scheduled nodes shouldn't be affected by stopping
                     let flowInstanceId = flowInstance.flowInstanceId;
-                    const totalNI = await NodeInstance_1.default.find({ flowInstanceId, isActive: true });
-                    const nodeInstances = await (0, typeorm_1.getManager)().transaction(async (transactionalEntityManager) => {
-                        const queryBuilder = transactionalEntityManager.createQueryBuilder(NodeInstance_1.default, 'node_instance');
-                        queryBuilder
-                            .where('node_instance.flowInstanceId = :flowInstanceId', { flowInstanceId })
-                            .andWhere('((node_instance.status IS NULL AND (node_instance.schedule = :schedule OR node_instance.schedule IS NULL)) OR (node_instance.status = :status AND node_instance.schedule != :schedule AND node_instance.schedule IS NOT NULL))', {
-                            status: 'executed',
-                            schedule: '0000-00-00 00:00:00',
-                        });
-                        return queryBuilder.getMany();
-                    });
-                    if (totalNI.length > nodeInstances.length) {
-                        validFlowInstances.push(flowInstanceId);
-                    }
+                    const totalNI = await NodeInstanceModel.find({ flowInstanceId, isActive: true});
+                    const nodeInstances = await getManager().transaction(async (transactionalEntityManager) => {
+                       const queryBuilder: SelectQueryBuilder<NodeInstanceModel> = transactionalEntityManager.createQueryBuilder(NodeInstanceModel, 'node_instance');
+                       queryBuilder
+                         .where('node_instance.flowInstanceId = :flowInstanceId', { flowInstanceId })
+                         .andWhere('((node_instance.status IS NULL AND (node_instance.schedule = :schedule OR node_instance.schedule IS NULL)) OR (node_instance.status = :status AND node_instance.schedule != :schedule AND node_instance.schedule IS NOT NULL))', {
+                           status: 'executed',
+                           schedule: '0000-00-00 00:00:00',
+                         });
+ 
+                       return queryBuilder.getMany();
+                     });
+ 
+ 
+                   if (totalNI.length > nodeInstances.length ) {
+                     validFlowInstances.push(flowInstanceId);
+                   }*/
                 }
             }
             if (validFlowInstances.length > 0) {

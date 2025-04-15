@@ -932,24 +932,25 @@ class Flow extends Controller {
                 if (flowInstance.status!='processed'){
                    validFlowInstances.push(flowInstance.flowInstanceId);
                 }else{
+                   /*Commented because scheduled nodes shouldn't be affected by stopping
                    let flowInstanceId = flowInstance.flowInstanceId;
                    const totalNI = await NodeInstanceModel.find({ flowInstanceId, isActive: true});
                    const nodeInstances = await getManager().transaction(async (transactionalEntityManager) => {
-                   const queryBuilder: SelectQueryBuilder<NodeInstanceModel> = transactionalEntityManager.createQueryBuilder(NodeInstanceModel, 'node_instance');
-                   queryBuilder
-                      .where('node_instance.flowInstanceId = :flowInstanceId', { flowInstanceId })
-                      .andWhere('((node_instance.status IS NULL AND (node_instance.schedule = :schedule OR node_instance.schedule IS NULL)) OR (node_instance.status = :status AND node_instance.schedule != :schedule AND node_instance.schedule IS NOT NULL))', {
-                        status: 'executed',
-                        schedule: '0000-00-00 00:00:00',
-                      });
+                      const queryBuilder: SelectQueryBuilder<NodeInstanceModel> = transactionalEntityManager.createQueryBuilder(NodeInstanceModel, 'node_instance');
+                      queryBuilder
+                        .where('node_instance.flowInstanceId = :flowInstanceId', { flowInstanceId })
+                        .andWhere('((node_instance.status IS NULL AND (node_instance.schedule = :schedule OR node_instance.schedule IS NULL)) OR (node_instance.status = :status AND node_instance.schedule != :schedule AND node_instance.schedule IS NOT NULL))', {
+                          status: 'executed',
+                          schedule: '0000-00-00 00:00:00',
+                        });
 
-                  return queryBuilder.getMany();
-                });
+                      return queryBuilder.getMany();
+                    });
 
 
                   if (totalNI.length > nodeInstances.length ) {
                     validFlowInstances.push(flowInstanceId);
-                  }
+                  }*/
                 }
 
 

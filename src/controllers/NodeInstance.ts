@@ -47,11 +47,12 @@ class NodeInstance extends Controller {
     _.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
     //todo after this we need to get the json variables and execute the view and conditions configured in the database
     const { node, flowInstance, eventNode } = params;
+    console.log("RecursiveInstance flow-nd---> node:", node);
     try {
       const executeView = `select * from ${flowInstance.originName} where ${flowInstance.originKey} = ${flowInstance.dataId}`;
       const resExecuteView = await __(getManager().query(executeView));
       const resultFromOrigin = resExecuteView[0];
-
+console.log("**** resultFromOrigin:", resultFromOrigin);
       let mergeJson = {};
       const {
         actionConfigJson,
@@ -71,7 +72,13 @@ class NodeInstance extends Controller {
           ...(configJsonTemplateObject || {}), // first object must be of the node table
           ...(actionConfigJsonObject || {}),
           __resultFromOrigin: resultFromOrigin,
+          uniqueArgs: {
+            flowInstance: flowInstance.flowInstanceId,
+            nodeId: node.nodeId
+          }
         };
+
+        console.log("--->>>mergeJson::", mergeJson);
       }
 
       let nodeInstance = new NodeInstanceModel();

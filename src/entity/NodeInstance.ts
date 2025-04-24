@@ -33,6 +33,9 @@ export default class NodeInstance extends PxpEntity{
   @Column({ name: 'status', type: 'varchar', nullable: false, length: 50 })
   status: string;
 
+  @Column({ name: 'extra_args', type: 'json', nullable: true })
+  extraArgs?: Record<string, unknown>;
+
   @ManyToOne(() => FlowInstance, flowInstance => flowInstance.nodeInstances)
   @JoinColumn({ name: 'flow_instance_id' })
   flowInstance: FlowInstance;

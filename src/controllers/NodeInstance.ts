@@ -42,7 +42,7 @@ import { GlobalData } from "@pxp-nd/common";
 
 @Model("flow-nd/NodeInstance")
 class NodeInstance extends Controller {
-  async RecursiveInstance(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+  async RecursiveInstance(params: Record<string, any>, manager: EntityManager): Promise<unknown> { console.log ("==========node instance en MZM===========");
     //https://lodash.com/docs/4.17.15#template
     _.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
     //todo after this we need to get the json variables and execute the view and conditions configured in the database
@@ -53,7 +53,8 @@ class NodeInstance extends Controller {
       const resExecuteView = await __(getManager().query(executeView));
       const resultFromOrigin = resExecuteView[0];
 console.log("**** resultFromOrigin:", resultFromOrigin);
-      let mergeJson = {};
+      //let mergeJson = {};
+      let mergeJson: Record<string, any> = {};
       const {
         actionConfigJson,
         action: {
@@ -97,6 +98,13 @@ console.log("**** resultFromOrigin:", resultFromOrigin);
       } else {
         if (node.action.actionType.controller) {
           const data = "";
+          const res = await manager.save(NodeInstanceModel, nodeInstance);
+          const nodeInstanceId = res.nodeInstanceId;
+          console.log("el id q tenemos q mandarrrrrr:::", nodeInstanceId);
+
+          if (nodeInstanceId){
+            mergeJson.nodeInstanceId = nodeInstanceId;
+          }
 
           const config = {
             method: "post",
@@ -110,9 +118,20 @@ console.log("**** resultFromOrigin:", resultFromOrigin);
 
           // @ts-ignore
           const resControllerAxios = await __(axios(config));
+
+          if ('data' in resControllerAxios && resControllerAxios.data) {
+             const response = resControllerAxios.data;
+            if ('tokenId' in response && response.tokenId) {
+              nodeInstance.extraArgs = { tokenId: response.tokenId };
+              await manager.save(NodeInstanceModel, nodeInstance);
+            }
+
+          }
+
+          console.log("la respuesta del Axiossss:", resControllerAxios.data);
         }
 
-        await manager.save(NodeInstanceModel, nodeInstance);
+
         // @ts-ignore
         const nodeConnectionList = await __(
           NodeConnection.find({ where: { nodeIdMaster: node.nodeId } })

@@ -42,7 +42,7 @@ import { GlobalData } from "@pxp-nd/common";
 
 @Model("flow-nd/NodeInstance")
 class NodeInstance extends Controller {
-  async RecursiveInstance(params: Record<string, any>, manager: EntityManager): Promise<unknown> { console.log ("==========node instance en MZM===========");
+  async RecursiveInstance(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
     //https://lodash.com/docs/4.17.15#template
     _.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
     //todo after this we need to get the json variables and execute the view and conditions configured in the database

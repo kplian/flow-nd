@@ -11,6 +11,8 @@
  *
  * Created at     : 2021-07-08 12:55:38
  * Last modified  :
+ *  ISSUE         DATE           AUTHOR              DESCRIPTION
+ *  25-Apr-2025   8914754251     Mercedes Zambrana   Validate and use node?.action?.controllerFunction
  */
 
 import { EntityManager, getManager } from "typeorm";
@@ -42,17 +44,18 @@ import { GlobalData } from "@pxp-nd/common";
 
 @Model("flow-nd/NodeInstance")
 class NodeInstance extends Controller {
-  async RecursiveInstance(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+  async RecursiveInstance(params: Record<string, any>, manager: EntityManager): Promise<unknown> { console.log ("viene al nodeInstance");
     //https://lodash.com/docs/4.17.15#template
     _.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
     //todo after this we need to get the json variables and execute the view and conditions configured in the database
     const { node, flowInstance, eventNode } = params;
-    console.log("RecursiveInstance flow-nd---> node:", node);
+
     try {
       const executeView = `select * from ${flowInstance.originName} where ${flowInstance.originKey} = ${flowInstance.dataId}`;
+
       const resExecuteView = await __(getManager().query(executeView));
       const resultFromOrigin = resExecuteView[0];
-console.log("**** resultFromOrigin:", resultFromOrigin);
+
       //let mergeJson = {};
       let mergeJson: Record<string, any> = {};
       const {
@@ -79,7 +82,7 @@ console.log("**** resultFromOrigin:", resultFromOrigin);
           }
         };
 
-        console.log("--->>>mergeJson::", mergeJson);
+
       }
 
       let nodeInstance = new NodeInstanceModel();
@@ -100,21 +103,37 @@ console.log("**** resultFromOrigin:", resultFromOrigin);
           const data = "";
           const res = await manager.save(NodeInstanceModel, nodeInstance);
           const nodeInstanceId = res.nodeInstanceId;
-          console.log("el id q tenemos q mandarrrrrr:::", nodeInstanceId);
+
 
           if (nodeInstanceId){
             mergeJson.nodeInstanceId = nodeInstanceId;
           }
 
-          const config = {
-            method: "post",
-            url: `http://localhost:${process.env.PORT}/api/${node.action.actionType.controller}`,
-            headers: {
-              Authorization: "" + process.env.TOKEN_PXP_ND + "",
-              "Content-Type": "application/json",
-            },
-            data: mergeJson,
-          };
+
+          if (!!node?.action?.controllerFunction) {
+
+            const config = {
+              method: "post",
+              url: `http://localhost:${process.env.PORT}/api/${node.action.controllerFunction}`,
+              headers: {
+                Authorization: "" + process.env.TOKEN_PXP_ND + "",
+                "Content-Type": "application/json",
+              },
+              data: mergeJson,
+            };
+
+          }else{
+            const config = {
+              method: "post",
+              url: `http://localhost:${process.env.PORT}/api/${node.action.actionType.controller}`,
+              headers: {
+                Authorization: "" + process.env.TOKEN_PXP_ND + "",
+                "Content-Type": "application/json",
+              },
+              data: mergeJson,
+            };
+          }
+
 
           // @ts-ignore
           const resControllerAxios = await __(axios(config));
@@ -128,7 +147,7 @@ console.log("**** resultFromOrigin:", resultFromOrigin);
 
           }
 
-          console.log("la respuesta del Axiossss:", resControllerAxios.data);
+
         }
 
 

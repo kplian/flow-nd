@@ -33,7 +33,7 @@ import NodeConnection from "../entity/NodeConnection";
 import NodeInstanceModel from "../entity/NodeInstance";
 import Node from "../entity/Node";
 import FlowLog from "../entity/FlowLog";
-import axios from "axios";
+import axios, { Method } from "axios";
 import ActionType from "../entity/ActionType";
 import Action from "../entity/Action";
 import _ from "lodash";
@@ -44,7 +44,7 @@ import { GlobalData } from "@pxp-nd/common";
 
 @Model("flow-nd/NodeInstance")
 class NodeInstance extends Controller {
-  async RecursiveInstance(params: Record<string, any>, manager: EntityManager): Promise<unknown> { console.log ("viene al nodeInstance");
+  async RecursiveInstance(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
     //https://lodash.com/docs/4.17.15#template
     _.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
     //todo after this we need to get the json variables and execute the view and conditions configured in the database
@@ -113,7 +113,7 @@ class NodeInstance extends Controller {
           if (!!node?.action?.controllerFunction) {
 
             const config = {
-              method: "post",
+              method: "post" as Method,
               url: `http://localhost:${process.env.PORT}/api/${node.action.controllerFunction}`,
               headers: {
                 Authorization: "" + process.env.TOKEN_PXP_ND + "",
@@ -122,9 +122,20 @@ class NodeInstance extends Controller {
               data: mergeJson,
             };
 
+            const resControllerAxios = await __(axios(config));
+
+            if ('data' in resControllerAxios && resControllerAxios.data) {
+              const response = resControllerAxios.data;
+              if ('tokenId' in response && response.tokenId) {
+                nodeInstance.extraArgs = { tokenId: response.tokenId };
+                await manager.save(NodeInstanceModel, nodeInstance);
+              }
+
+            }
+
           }else{
             const config = {
-              method: "post",
+              method: "post" as Method,
               url: `http://localhost:${process.env.PORT}/api/${node.action.actionType.controller}`,
               headers: {
                 Authorization: "" + process.env.TOKEN_PXP_ND + "",
@@ -132,21 +143,18 @@ class NodeInstance extends Controller {
               },
               data: mergeJson,
             };
-          }
 
+            const resControllerAxios = await __(axios(config));
 
-          // @ts-ignore
-          const resControllerAxios = await __(axios(config));
+            if ('data' in resControllerAxios && resControllerAxios.data) {
+              const response = resControllerAxios.data;
+              if ('tokenId' in response && response.tokenId) {
+                nodeInstance.extraArgs = { tokenId: response.tokenId };
+                await manager.save(NodeInstanceModel, nodeInstance);
+              }
 
-          if ('data' in resControllerAxios && resControllerAxios.data) {
-             const response = resControllerAxios.data;
-            if ('tokenId' in response && response.tokenId) {
-              nodeInstance.extraArgs = { tokenId: response.tokenId };
-              await manager.save(NodeInstanceModel, nodeInstance);
             }
-
           }
-
 
         }
 

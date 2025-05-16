@@ -11,6 +11,8 @@
  *
  * Created at     : 2021-07-08 12:55:38
  * Last modified  :
+ *   ISSUE        DATE        NAME                DESCRIPTION
+ *  9141239986   16-May-2025  Mercedes Zambrana   Save flagName and FlagValue
  */
 
 import { EntityManager, getManager } from 'typeorm';
@@ -51,6 +53,7 @@ class FlowInstance extends Controller {
           const flowInstances = await manager.find(FlowInstanceModel, { take: (maxFlows && maxFlows.value) as unknown as number, where: [{ status: 'pending' }], order: { flowInstanceId: "ASC" }});
           for(const flowInstance of flowInstances) {
               flowInstanceIdProcessing = flowInstance.flowInstanceId;
+
               const node = await Node.findOne({ where: { actionId: flowInstance.actionId, flowId: flowInstance.flowId }});
               const CNodeInstance = new NodeInstanceController('flow-nd', NodeInstance);
               try {
@@ -88,7 +91,7 @@ class FlowInstance extends Controller {
   }
 
   async eventProcesss(manager: EntityManager) {
-    
+
     const pendingEvents = await Event.find({ status: 'pending' });
 
     for (const newEvent of pendingEvents) {
@@ -105,6 +108,7 @@ class FlowInstance extends Controller {
           } = n;
           const executeView = `select * from ${originName} where ${originKey} = ${newEvent.dataId}`;
           const resExecuteView = await getManager().query(executeView);
+
           const flow = await __(Flow.findOne({ where: { flowId: n.flowId, isActive: 1, status: 'on' } }));
           if (
             flow && flow.vendorId == resExecuteView[0].vendor_id &&
@@ -169,7 +173,7 @@ class FlowInstance extends Controller {
   @ReadOnly(false)
   @Log(true)
   async insert(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
-    const { flowId, dataId, status, actionId, originName = '', originKey = '' } = params; 
+    const { flowId, dataId, status, actionId, originName = '', originKey = '' , flagName, flagValue} = params;
     let flowInstance = new FlowInstanceModel();
     flowInstance.flowId = flowId;
     flowInstance.dataId = dataId;
@@ -177,6 +181,11 @@ class FlowInstance extends Controller {
     flowInstance.originKey = originKey;
     flowInstance.actionId = actionId;
     flowInstance.status = status;
+    if (flagName !== undefined && flagValue !== undefined) {
+      flowInstance.flagName = flagName;
+      flowInstance.flagValue = flagValue;
+    }
+
     flowInstance = await manager.save(
       FlowInstanceModel,
       flowInstance

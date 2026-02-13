@@ -719,7 +719,7 @@ let Flow = class Flow extends core_1.Controller {
                 //valid controllerValidation
                 const { action: { actionType } } = node;
                 const { validationController } = actionType;
-                const nodeController = new Node_2.default('flow-nd');
+                const nodeController = new Node_2.default('flow-nd', Node_1.default);
                 await nodeController.executeValidationController({ validationController, actionConfigJson: values, showException: true });
                 //end valid controller
                 const missingRequired = [];

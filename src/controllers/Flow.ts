@@ -903,7 +903,7 @@ class Flow extends Controller {
         //valid controllerValidation
         const {action: { actionType }} = node;
         const { validationController } = actionType;
-        const nodeController = new NodeController('flow-nd');
+        const nodeController = new NodeController('flow-nd', NodeModel);
         await nodeController.executeValidationController({validationController, actionConfigJson: values, showException: true});
         //end valid controller
 

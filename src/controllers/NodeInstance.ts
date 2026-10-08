@@ -13,6 +13,7 @@
  * Last modified  :
  *  ISSUE         DATE           AUTHOR              DESCRIPTION
  *  25-Apr-2025   8914754251     Mercedes Zambrana   Validate and use node?.action?.controllerFunction
+ *  08-Oct-2026   EF-23          Favio Figueroa      GET_LOCK instead of flag, skipped=200, axios timeout
  */
 
 import { EntityManager, getManager } from "typeorm";
@@ -38,6 +39,7 @@ import ActionType from "../entity/ActionType";
 import Action from "../entity/Action";
 import _ from "lodash";
 import FlowInstance from "../entity/FlowInstance";
+import { withDbLock } from "../helpers/dbLock";
 
 //TODO replace this flow-nd need tobe independent library
 import { GlobalData } from "@pxp-nd/common";
@@ -120,6 +122,7 @@ class NodeInstance extends Controller {
                 "Content-Type": "application/json",
               },
               data: mergeJson,
+              timeout: Number(process.env.FLOW_ACTION_TIMEOUT_MS || 30000),
             };
 
             const resControllerAxios = await __(axios(config));
@@ -142,6 +145,7 @@ class NodeInstance extends Controller {
                 "Content-Type": "application/json",
               },
               data: mergeJson,
+              timeout: Number(process.env.FLOW_ACTION_TIMEOUT_MS || 30000),
             };
 
             const resControllerAxios = await __(axios(config));
@@ -184,7 +188,7 @@ class NodeInstance extends Controller {
       log.errorCustomMessage = `Error executing ${flowInstance.flowInstanceId} in NodeInstance-> RecursiveInstance `;
       log.errorMessage =  error.message;
       log.stackTrace = error.stack || '';
-      getManager().save(log);
+      await getManager().save(log).catch(e => console.error('[flow] FlowLog save failed', e.message));
     }
 
     return {};
@@ -198,16 +202,8 @@ class NodeInstance extends Controller {
     params: Record<string, any>,
     manager: EntityManager
   ): Promise<unknown> {
-    const flag = await GlobalData.findOne({
-      data: "wf_processing_delay_nodes_flag",
-    });
-    if (flag) {
-      if (flag.value == "true") {
-        throw new PxpError(400, "Already processing pending flows");
-      }
-      flag.value = "true";
-      await getManager().save(flag);
-      let nodeInstanceIdProcessing = -1;
+    let nodeInstanceIdProcessing = -1;
+    const { acquired } = await withDbLock("wf_process_delay", async () => {
       try {
         const maxNodes = await GlobalData.findOne({
           data: "wf_max_concurrent_delay_process",
@@ -273,15 +269,15 @@ class NodeInstance extends Controller {
           }
         }
       } catch (error) {
-        flag.value = "false";
-        await getManager().save(flag);
+        // The lock is released by withDbLock's finally block
         throw new PxpError(
           400,
           "Error processing node: " + nodeInstanceIdProcessing
         );
       }
-      flag.value = "false";
-      await getManager().save(flag);
+    });
+    if (!acquired) {
+      return { success: true, skipped: true, reason: "already running" };
     }
     return { success: true };
   }

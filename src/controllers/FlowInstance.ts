@@ -13,6 +13,7 @@
  * Last modified  :
  *   ISSUE        DATE        NAME                DESCRIPTION
  *  9141239986   16-May-2025  Mercedes Zambrana   Save flagName and FlagValue
+ *  EF-23        08-Oct-2026  Favio Figueroa      GET_LOCK instead of flag, skipped=200, axios timeout
  */
 
 import { EntityManager, getManager } from 'typeorm';
@@ -31,6 +32,7 @@ import Event from "../entity/Event";
 import Flow from "../entity/Flow";
 import Action from "../entity/Action";
 import FlowLog from "../entity/FlowLog";
+import { withDbLock } from '../helpers/dbLock';
 
 class FlowInstance extends Controller {
 
@@ -39,14 +41,8 @@ class FlowInstance extends Controller {
   @ReadOnly(false)
   @Log(true)
   async processPending(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
-    const flag = await GlobalData.findOne({ data : 'wf_processing_pending_flows_flag'});
-    if (flag){
-      if (flag.value == 'true') {
-          throw new PxpError(400, 'Already processing pending flows');
-      }
-      flag.value = 'true';
-      let flowInstanceIdProcessing = -1;
-      await getManager().save(flag);
+    let flowInstanceIdProcessing = -1;
+    const { acquired } = await withDbLock('wf_process_pending', async () => {
       try {
           await this.eventProcesss(manager);
           const maxFlows = await GlobalData.findOne({ data : 'wf_max_concurrent_flows_process'});
@@ -73,19 +69,17 @@ class FlowInstance extends Controller {
                     {status: 'processed'});
           }
       } catch(error) {
-
-          flag.value = 'false';
-          await getManager().save(flag);
+          // The lock is released by withDbLock's finally block
           const log = new FlowLog();
           log.errorCustomMessage = `Error executing ${flowInstanceIdProcessing} in FlowInstance-> processPending `;
           log.errorMessage =  error.message;
           log.stackTrace = error.stack || '';
-          getManager().save(log);
+          await getManager().save(log).catch(e => console.error('[flow] FlowLog save failed', e.message));
           throw new PxpError(400, 'Error processing flow: ' + flowInstanceIdProcessing);
       }
-
-      flag.value = 'false';
-      await getManager().save(flag);
+    });
+    if (!acquired) {
+      return { success: true, skipped: true, reason: 'already running' };
     }
     return { success: true }
   }
@@ -137,7 +131,7 @@ class FlowInstance extends Controller {
         log.errorCustomMessage = `Error processing event ${newEvent.eventId} in FlowInstance-> eventProcesss `;
         log.errorMessage =  error.message;
         log.stackTrace = error.stack || '';
-        getManager().save(log);
+        await getManager().save(log).catch(e => console.error('[flow] FlowLog save failed', e.message));
       }
     }
   }

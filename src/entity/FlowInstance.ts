@@ -1,3 +1,15 @@
+/*****************************************************************************
+ * Copyright(c) 2023 Qorus Inc
+ * All rights reserved
+ *****************************************************************************
+ * NAME: FlowListGridView.tsx
+ * DEVELOPER: Favio Figueroa
+ * DESCRIPTION:
+ * REVISIONS:
+ * Date Change      ID              Author              Description
+ * -----------      -----------     --------------      ------------------------------------
+ * 14-May-2025      9141239986     Mercedes Zambrana    add flag_name and flag_value
+ * ****************************************************************************/
 import {
 	OneToMany,
 	JoinColumn,
@@ -40,6 +52,12 @@ export default class FlowInstance extends PxpEntity{
 
 	@Column({ name: 'result_from_origen', type: 'text', nullable: false })
 	resultFromOrigen: string;
+
+	@Column({ name: 'flag_name', type: 'text', nullable: false })
+	flagName: string;
+
+	@Column({ name: 'flag_value', type: 'numeric', nullable: false })
+	flagValue: number;
 
 	@OneToMany(() => NodeInstance, (nodeInstance) => nodeInstance.flowInstance, {eager:true})
 	nodeInstances: NodeInstance[];

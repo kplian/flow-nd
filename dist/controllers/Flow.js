@@ -18,6 +18,9 @@
  * 01-Sep-2023    SP08SEP23     Rensi Arteaga          add base flow list
  * 16-Sep-2023    SP22SEP23     Mercedes Zambrana       Change GET to POST in insertEventFlow
  * 28-Sep-2023    SP06OCT23     Mercedes Zambrana      Add Validation when change off status (validateFlow, deleteflow, saveFlow, saveflowName)
+ * 07-Feb-2025    8353064698    Mercedes Zambrana      Add validation for opt in page when flow si funnel change
+ * 18-Feb-2025    8501163144    Mercedes Zambrana      Add publish filter
+ * 06-Nov-2026                     Rensi Arteaga         @ApiDoc for OpenAPI (spec 04)
  * ******************************************************************************
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -64,11 +67,16 @@ const Action_1 = __importDefault(require("../entity/Action"));
 const NodeConnection_1 = __importDefault(require("../entity/NodeConnection"));
 const Flow_1 = __importDefault(require("../entity/Flow"));
 const FlowInstance_1 = __importDefault(require("../entity/FlowInstance"));
-const NodeInstance_1 = __importDefault(require("../entity/NodeInstance"));
 const Node_2 = __importDefault(require("./Node"));
+const axios_1 = __importDefault(require("axios"));
 //import {configFacebookStrategy} from "./passport-facebook";
+const FlowNdApiDocs_1 = require("../helpers/FlowNdApiDocs");
 let Flow = class Flow extends core_1.Controller {
     async get(params) {
+        const fid = Number(params.flowId);
+        if (!Number.isInteger(fid) || fid < 1) {
+            throw new core_1.PxpError(400, 'flowId is required and must be a positive integer');
+        }
         const nodes = await Node_1.default.find({ flowId: params.flowId });
         const restNodes = [];
         for (let node of nodes) {
@@ -91,22 +99,55 @@ let Flow = class Flow extends core_1.Controller {
         }
         return restNodes;
     }
-    async copyNodeConnections(nodeId, newNodeId, newFlowId, manager) {
+    async copyNodeConnections(nodeId, newNodeId, newFlowId, manager, isCopy = false) {
         const connections = await (0, core_1.__)(NodeConnection_1.default.find({ nodeIdMaster: nodeId, isActive: true }));
         for (let connection of connections) {
             const newNodeConnection = new NodeConnection_1.default();
             const { nodeConnectionId, nodeIdMaster, nodeIdChild, createdAt, modifiedAt, ...nodeConnectionToCopy } = connection;
             // get node from nodeIdChild
             const dataNodeChild = await Node_1.default.findOne({ nodeId: connection.nodeIdChild });
-            const { nodeId: newNodeIdChild } = await this.copyNode(dataNodeChild, newFlowId, manager);
+            const { nodeId: newNodeIdChild } = await this.copyNode(dataNodeChild, newFlowId, manager, false, isCopy);
             Object.assign(newNodeConnection, { ...nodeConnectionToCopy, nodeIdMaster: newNodeId, nodeIdChild: newNodeIdChild });
             const insertNewNodeConnection = await (0, core_1.__)(manager.save(NodeConnection_1.default, newNodeConnection));
         }
     }
-    async copyNode(node, newFlowId, manager, isFirst = false) {
+    async copyNode(node, newFlowId, manager, isFirst = false, isCopy = false) {
+        var _a, _b, _c, _d;
         // insert new node
         const newNode = new Node_1.default();
         const { nodeId, flowId, createdAt, modifiedAt, ...nodeToCopy } = node;
+        if (isCopy && ((_b = (_a = nodeToCopy === null || nodeToCopy === void 0 ? void 0 : nodeToCopy.action) === null || _a === void 0 ? void 0 : _a.actionType) === null || _b === void 0 ? void 0 : _b.onDuplicate) === 'duplicateChainedFlow') {
+            if ((_c = nodeToCopy === null || nodeToCopy === void 0 ? void 0 : nodeToCopy.action) === null || _c === void 0 ? void 0 : _c.configJsonTemplate) {
+                try {
+                    const parsedConfig = JSON.parse(nodeToCopy.action.configJsonTemplate);
+                    if (parsedConfig.addController && parsedConfig.template) {
+                        const params = {
+                            template: parsedConfig.template,
+                            flowId: newFlowId,
+                        };
+                        const config = {
+                            method: "post",
+                            url: `http://localhost:${process.env.PORT}/api/${parsedConfig.addController}`,
+                            headers: {
+                                Authorization: "" + process.env.TOKEN_PXP_ND + "",
+                                "Content-Type": "application/json",
+                            },
+                            data: params,
+                        };
+                        const resControllerAxios = await (0, axios_1.default)(config);
+                        const chainedFlowId = (_d = resControllerAxios.data) === null || _d === void 0 ? void 0 : _d.flowId;
+                        const parsedValues = {
+                            flowId: chainedFlowId
+                        };
+                        const newConfigJson = JSON.stringify(parsedValues);
+                        nodeToCopy.actionConfigJson = newConfigJson;
+                    }
+                }
+                catch (error) {
+                    console.error("Not valid json", error);
+                }
+            }
+        }
         Object.assign(newNode, { ...nodeToCopy, flowId: newFlowId });
         const insertNewNode = await (0, core_1.__)(manager.save(Node_1.default, newNode));
         if (isFirst) {
@@ -118,7 +159,7 @@ let Flow = class Flow extends core_1.Controller {
             await manager.save(duplicatedConnection);
         }
         // insert connection
-        await this.copyNodeConnections(node.nodeId, insertNewNode.nodeId, newFlowId, manager);
+        await this.copyNodeConnections(node.nodeId, insertNewNode.nodeId, newFlowId, manager, isCopy);
         return { nodeId: insertNewNode.nodeId };
     }
     async createFlowFromFlow(params, manager) {
@@ -215,15 +256,16 @@ let Flow = class Flow extends core_1.Controller {
                 status: 'off'
             };
             let flowDataClone;
-            //if we have a vendoId as parameter the origin is a template
-            if (params.vendorId) {
-                flowDataClone = await manager.save(Flow_1.default, { ...flowToClone, name: `${params.name}`, vendorId: params.vendorId, type: 'custom' });
+            let isCopy = false;
+            //if we have a name as parameter the origin is a template
+            if (params.name) {
+                flowDataClone = await (0, typeorm_1.getManager)().save(Flow_1.default, { ...flowToClone, name: `${params.name}`, vendorId: params.vendorId, type: 'custom' });
             }
             else {
-                flowDataClone = await manager.save(Flow_1.default, { ...flowToClone, name: `${flowData.name} Copy` });
+                flowDataClone = await (0, typeorm_1.getManager)().save(Flow_1.default, { ...flowToClone, name: `${flowData.name} Copy` });
             }
             const dataNode = await Node_1.default.findOne({ where: { flowId: params.flowId, isInit: 'Y', isActive: true }, order: { nodeId: "ASC" } });
-            dataNode && await this.copyNode(dataNode, flowDataClone.flowId, manager, true);
+            dataNode && await this.copyNode(dataNode, flowDataClone.flowId, manager, true, isCopy);
             return { success: true, flowId: flowDataClone.flowId };
         }
         else {
@@ -231,6 +273,7 @@ let Flow = class Flow extends core_1.Controller {
         }
     }
     async saveFlow(params, manager) {
+        var _a, _b, _c, _d;
         let nodeRefIds = params.board.columns['2-column-nodes-configured'].taskIds;
         let nodes = params.board.tasks ? params.board.tasks : [];
         let masterId = null;
@@ -285,7 +328,7 @@ let Flow = class Flow extends core_1.Controller {
                         });
                         if (connectionsToDel) {
                             const originalNodeCIds = connectionsToDel.map((node) => node.nodeConnectionId);
-                            let flowNodeC = await (0, typeorm_1.getManager)().query(`DELETE
+                            let flowNodeC = await manager.query(`DELETE
                                                        from twf_node_connection
                                                        WHERE node_connection_id = ${originalNodeCIds}`);
                         }
@@ -322,6 +365,40 @@ let Flow = class Flow extends core_1.Controller {
                             await manager.query(dNode);
                         }
                     }
+                    if (flowIdDel.action.actionType.name === 'CHAINED FLOW') {
+                        if (((_a = flowIdDel.action) === null || _a === void 0 ? void 0 : _a.configJsonTemplate) && flowIdDel.actionConfigJson) {
+                            try {
+                                const parsedConfig = JSON.parse(flowIdDel.action.configJsonTemplate);
+                                const parsedValues = JSON.parse(flowIdDel.actionConfigJson);
+                                if (parsedConfig.deleteController && parsedValues.flowId) {
+                                    const params = {
+                                        flowId: parsedValues.flowId,
+                                    };
+                                    const config = {
+                                        method: "post",
+                                        url: `http://localhost:${process.env.PORT}/api/${parsedConfig.deleteController}`,
+                                        headers: {
+                                            Authorization: "" + process.env.TOKEN_PXP_ND + "",
+                                            "Content-Type": "application/json",
+                                        },
+                                        data: params,
+                                    };
+                                    const resControllerAxios = await (0, axios_1.default)(config);
+                                    console.log('resControllerAxios.data', resControllerAxios.data);
+                                }
+                            }
+                            catch (error) {
+                                if (axios_1.default.isAxiosError(error) && error.response) {
+                                    const message = ((_c = (_b = error.response.data) === null || _b === void 0 ? void 0 : _b.error) === null || _c === void 0 ? void 0 : _c.message) || 'Unknown error';
+                                    throw new core_1.PxpError(400, message);
+                                }
+                                else {
+                                    console.error("Not valid json", error);
+                                    throw new core_1.PxpError(500, 'Unexpected error while processing the request');
+                                }
+                            }
+                        }
+                    }
                 }
                 else {
                     throw new core_1.PxpError(400, 'Please turn off the flow before make a change');
@@ -347,6 +424,38 @@ let Flow = class Flow extends core_1.Controller {
                         const saveNode = await manager.save(newNode);
                         id = saveNode.nodeId;
                         newId = saveNode.nodeId;
+                        if (newAction.actionType.name === 'CHAINED FLOW') {
+                            if (newAction === null || newAction === void 0 ? void 0 : newAction.configJsonTemplate) {
+                                try {
+                                    const parsedConfig = JSON.parse(newAction.configJsonTemplate);
+                                    if (parsedConfig.addController && parsedConfig.template) {
+                                        const params = {
+                                            template: parsedConfig.template,
+                                            flowId,
+                                        };
+                                        const config = {
+                                            method: "post",
+                                            url: `http://localhost:${process.env.PORT}/api/${parsedConfig.addController}`,
+                                            headers: {
+                                                Authorization: "" + process.env.TOKEN_PXP_ND + "",
+                                                "Content-Type": "application/json",
+                                            },
+                                            data: params,
+                                        };
+                                        const resControllerAxios = await (0, axios_1.default)(config);
+                                        const chainedFlowId = (_d = resControllerAxios.data) === null || _d === void 0 ? void 0 : _d.flowId;
+                                        const parsedValues = {
+                                            flowId: chainedFlowId
+                                        };
+                                        saveNode.actionConfigJson = JSON.stringify(parsedValues);
+                                        await manager.save(saveNode);
+                                    }
+                                }
+                                catch (error) {
+                                    console.error("Not valid json", error);
+                                }
+                            }
+                        }
                     }
                     else {
                         id = nodeId;
@@ -374,6 +483,10 @@ let Flow = class Flow extends core_1.Controller {
     }
     async getFlowRender(params) {
         var _a;
+        const fid = Number(params.flowId);
+        if (!Number.isInteger(fid) || fid < 1) {
+            throw new core_1.PxpError(400, 'flowId is required and must be a positive integer');
+        }
         const flow = await (0, typeorm_1.getManager)().findOne(Flow_1.default, params.flowId);
         const totalNodes = await (0, typeorm_1.getManager)()
             .createQueryBuilder(Node_1.default, "n")
@@ -386,15 +499,20 @@ let Flow = class Flow extends core_1.Controller {
             .getOne();
         let cond = " and 0=0";
         if (!totalNodes) {
-            cond = " and at.name= 'EVENT' ";
+            if (flow.templateType == 'funnel') {
+                cond = " and a.name='Opt-In Page' ";
+            }
+            else {
+                cond = " and at.name= 'EVENT' ";
+            }
         }
         else {
             const oName = (_a = totalNodes === null || totalNodes === void 0 ? void 0 : totalNodes.action) === null || _a === void 0 ? void 0 : _a.originName;
             if (flow.templateType == 'funnel') {
-                cond = `and (at.name ='PAGE') and (a.originName is null or a.originName = '${oName}')`;
+                cond = `and (at.name ='PAGE' || at.name = 'CHAINED FLOW') and (a.originName is null or a.originName = '${oName}')`;
             }
             else {
-                cond = `and (at.name != 'EVENT' and at.name!='PAGE') and (a.originName is null or a.originName = '${oName}')`;
+                cond = `and (at.name != 'EVENT' and at.name!='PAGE' and at.name!='CHAINED FLOW') and (a.originName is null or a.originName = '${oName}')`;
             }
         }
         let actions = await (0, typeorm_1.getManager)()
@@ -611,7 +729,7 @@ let Flow = class Flow extends core_1.Controller {
                 //valid controllerValidation
                 const { action: { actionType } } = node;
                 const { validationController } = actionType;
-                const nodeController = new Node_2.default('flow-nd');
+                const nodeController = new Node_2.default('flow-nd', Node_1.default);
                 await nodeController.executeValidationController({ validationController, actionConfigJson: values, showException: true });
                 //end valid controller
                 const missingRequired = [];
@@ -638,21 +756,25 @@ let Flow = class Flow extends core_1.Controller {
                     validFlowInstances.push(flowInstance.flowInstanceId);
                 }
                 else {
+                    /*Commented because scheduled nodes shouldn't be affected by stopping
                     let flowInstanceId = flowInstance.flowInstanceId;
-                    const totalNI = await NodeInstance_1.default.find({ flowInstanceId, isActive: true });
-                    const nodeInstances = await (0, typeorm_1.getManager)().transaction(async (transactionalEntityManager) => {
-                        const queryBuilder = transactionalEntityManager.createQueryBuilder(NodeInstance_1.default, 'node_instance');
-                        queryBuilder
-                            .where('node_instance.flowInstanceId = :flowInstanceId', { flowInstanceId })
-                            .andWhere('((node_instance.status IS NULL AND node_instance.schedule = :schedule) OR (node_instance.status = :status AND node_instance.schedule != :schedule))', {
-                            status: 'executed',
-                            schedule: '0000-00-00 00:00:00',
-                        });
-                        return queryBuilder.getMany();
-                    });
-                    if (totalNI.length > nodeInstances.length) {
-                        validFlowInstances.push(flowInstanceId);
-                    }
+                    const totalNI = await NodeInstanceModel.find({ flowInstanceId, isActive: true});
+                    const nodeInstances = await getManager().transaction(async (transactionalEntityManager) => {
+                       const queryBuilder: SelectQueryBuilder<NodeInstanceModel> = transactionalEntityManager.createQueryBuilder(NodeInstanceModel, 'node_instance');
+                       queryBuilder
+                         .where('node_instance.flowInstanceId = :flowInstanceId', { flowInstanceId })
+                         .andWhere('((node_instance.status IS NULL AND (node_instance.schedule = :schedule OR node_instance.schedule IS NULL)) OR (node_instance.status = :status AND node_instance.schedule != :schedule AND node_instance.schedule IS NOT NULL))', {
+                           status: 'executed',
+                           schedule: '0000-00-00 00:00:00',
+                         });
+ 
+                       return queryBuilder.getMany();
+                     });
+ 
+ 
+                   if (totalNI.length > nodeInstances.length ) {
+                     validFlowInstances.push(flowInstanceId);
+                   }*/
                 }
             }
             if (validFlowInstances.length > 0) {
@@ -670,6 +792,15 @@ let Flow = class Flow extends core_1.Controller {
         const filter = (params === null || params === void 0 ? void 0 : params.filter) ? JSON.parse(params === null || params === void 0 ? void 0 : params.filter) : null;
         const filters = (filter === null || filter === void 0 ? void 0 : filter.items) || [];
         const logicOperator = ((_a = filter === null || filter === void 0 ? void 0 : filter.logicOperator) === null || _a === void 0 ? void 0 : _a.toUpperCase()) || 'AND';
+        const allowedSort = ['flowId', 'name', 'createdAt', 'modifiedAt'];
+        const allowedDir = ['ASC', 'DESC'];
+        const sortCol = params.sort != null && params.sort !== '' ? String(params.sort) : 'flowId';
+        const dirVal = params.dir != null && params.dir !== ''
+            ? String(params.dir).toUpperCase()
+            : 'ASC';
+        if (!allowedSort.includes(sortCol) || !allowedDir.includes(dirVal)) {
+            throw new core_1.PxpError(400, 'sort and dir must be allowed values (whitelist for SQL orderBy)');
+        }
         const queryBuilder = await (0, typeorm_1.getManager)()
             .createQueryBuilder()
             .select([
@@ -776,7 +907,7 @@ let Flow = class Flow extends core_1.Controller {
         // Sorting and pagination
         //queryBuilder.orderBy(`f.${params.sort}`, params.dir).skip(params.start).take(params.limit);
         // Sorting and pagination
-        queryBuilder.orderBy(`f.${params.sort}`, params.dir);
+        queryBuilder.orderBy(`f.${sortCol}`, dirVal);
         // Agrega manualmente la cláusula LIMIT y OFFSET
         queryBuilder.limit(params.limit).offset(params.start);
         const data = await queryBuilder.getRawMany();
@@ -806,12 +937,215 @@ let Flow = class Flow extends core_1.Controller {
         const count = totalCount.count;
         return { data, count };
     }
+    async listTemplates(params) {
+        var _a;
+        const isActive = params._isActive;
+        const type = params._type || "template"; // Filtrar solo templates
+        const vendorIds = params._vendorId ? params._vendorId.split(",").map(Number) : [];
+        const templateType = params._templateType;
+        const allowedColumns = ["name", "description"];
+        const filter = (params === null || params === void 0 ? void 0 : params.filter) ? JSON.parse(params === null || params === void 0 ? void 0 : params.filter) : null;
+        const filters = (filter === null || filter === void 0 ? void 0 : filter.items) || [];
+        const logicOperator = ((_a = filter === null || filter === void 0 ? void 0 : filter.logicOperator) === null || _a === void 0 ? void 0 : _a.toUpperCase()) || "AND";
+        const publish = params._publish;
+        const allowedSort = ["flowId", "name", "createdAt", "modifiedAt"];
+        const allowedDir = ["ASC", "DESC"];
+        const sortCol = params.sort != null && params.sort !== "" ? String(params.sort) : "flowId";
+        const dirVal = params.dir != null && params.dir !== ""
+            ? String(params.dir).toUpperCase()
+            : "ASC";
+        if (!allowedSort.includes(sortCol) || !allowedDir.includes(dirVal)) {
+            throw new core_1.PxpError(400, "sort and dir must be allowed values (whitelist for SQL orderBy)");
+        }
+        const queryBuilder = await (0, typeorm_1.getManager)()
+            .createQueryBuilder()
+            .select([
+            "f.flow_id as flowId",
+            "f.vendor_id as vendorId",
+            "f.code as code",
+            "f.name as name",
+            "f.enabled as enabled",
+            "f.type as type",
+            "f.created_by as createdBy",
+            "f.user_id_ai as userIdAi",
+            "f.user_ai as userAi",
+            "f.modified_by as modifiedBy",
+            "f.created_at as createdAt",
+            "f.modified_at as modifiedAt",
+            "f.is_active as isActive",
+            "f.description as description",
+            "f.icon as icon",
+            "f.status as status",
+            "COUNT(fi.flow_instance_id) AS numberOfInstance",
+        ])
+            .from("twf_flow", "f")
+            .leftJoin("twf_flow_instance", "fi", "fi.flow_id = f.flow_id");
+        // Aplicar filtros
+        if (isActive !== undefined) {
+            queryBuilder.where("f.is_active = :isActive", { isActive });
+        }
+        if (publish !== undefined) {
+            queryBuilder.where("f.publish = :publish", { publish });
+        }
+        if (type) {
+            queryBuilder.andWhere("f.type = :type", { type });
+        }
+        if (templateType) {
+            queryBuilder.andWhere("f.template_type = :templateType", { templateType });
+        }
+        if (vendorIds.length > 0) {
+            queryBuilder.andWhere("f.vendor_id IN (:...vendorIds)", { vendorIds });
+        }
+        if (allowedColumns.includes(params.genericFilterFields)) {
+            if (params.genericFilterFields && params.genericFilterValue) {
+                queryBuilder.andWhere(`f.${params.genericFilterFields} LIKE :genericFilterValue`, {
+                    genericFilterValue: `%${params.genericFilterValue}%`,
+                });
+            }
+        }
+        const applyDynamicFilters = (queryBuilder, filters, logicOperator) => {
+            filters.forEach((filter, index) => {
+                const { field, operator, value } = filter;
+                const queryField = `f.${field}`;
+                const parameterName = `filterValue${index}`;
+                let condition;
+                switch (operator) {
+                    case 'contains':
+                        condition = `${queryField} LIKE :${parameterName}`;
+                        queryBuilder.setParameter(parameterName, `%${value}%`);
+                        break;
+                    case 'equals':
+                        condition = `${queryField} = :${parameterName}`;
+                        queryBuilder.setParameter(parameterName, value);
+                        break;
+                    case 'startsWith':
+                        condition = `${queryField} LIKE :${parameterName}`;
+                        queryBuilder.setParameter(parameterName, `${value}%`);
+                        break;
+                    case 'endsWith':
+                        condition = `${queryField} LIKE :${parameterName}`;
+                        queryBuilder.setParameter(parameterName, `%${value}`);
+                        break;
+                    case 'isEmpty':
+                        condition = `${queryField} IS NULL OR ${queryField} = ''`;
+                        break;
+                    case 'isNotEmpty':
+                        condition = `${queryField} IS NOT NULL AND ${queryField} <> ''`;
+                        break;
+                    case 'isAnyOf':
+                        condition = `${queryField} IN (:...${parameterName})`;
+                        queryBuilder.setParameter(parameterName, value.split(','));
+                        break;
+                    default:
+                        throw new Error(`Operator ${operator} is not supported.`);
+                }
+                if (index === 0) {
+                    queryBuilder.andWhere(condition);
+                }
+                else {
+                    queryBuilder[logicOperator === 'OR' ? 'orWhere' : 'andWhere'](condition);
+                }
+            });
+        };
+        // Aplicar filtros dinámicos
+        applyDynamicFilters(queryBuilder, filters, logicOperator);
+        queryBuilder.groupBy([
+            "f.flow_id",
+            "f.vendor_id",
+            "f.code",
+            "f.name",
+            "f.enabled",
+            "f.type",
+            "f.created_by",
+            "f.user_id_ai",
+            "f.user_ai",
+            "f.modified_by",
+            "f.created_at",
+            "f.modified_at",
+            "f.is_active",
+            "f.description",
+            "f.icon",
+            "f.status",
+        ]);
+        // Ordenamiento y paginación
+        queryBuilder.orderBy(`f.${sortCol}`, dirVal);
+        queryBuilder.limit(params.limit || 50).offset(params.start || 0);
+        // Obtener los datos
+        const data = await queryBuilder.getRawMany();
+        // Query para contar registros
+        const countQuery = await (0, typeorm_1.getManager)()
+            .createQueryBuilder()
+            .select("COUNT(f.flow_id)", "count")
+            .from("twf_flow", "f");
+        if (isActive !== undefined) {
+            countQuery.where("f.is_active = :isActive", { isActive });
+        }
+        if (publish !== undefined) {
+            countQuery.where("f.publish = :publish", { publish });
+        }
+        if (type) {
+            countQuery.andWhere("f.type = :type", { type });
+        }
+        if (templateType) {
+            countQuery.andWhere("f.template_type = :templateType", { templateType });
+        }
+        if (vendorIds.length > 0) {
+            countQuery.andWhere("f.vendor_id IN (:...vendorIds)", { vendorIds });
+        }
+        if (allowedColumns.includes(params.genericFilterFields)) {
+            if (params.genericFilterFields && params.genericFilterValue) {
+                countQuery.andWhere(`f.${params.genericFilterFields} LIKE :genericFilterValue`, {
+                    genericFilterValue: `%${params.genericFilterValue}%`,
+                });
+            }
+        }
+        // Aplicar filtros dinámicos en el conteo
+        applyDynamicFilters(countQuery, filters, logicOperator);
+        const totalCount = await countQuery.getRawOne();
+        return { data, count: totalCount.count };
+    }
+    async changePublishTemplate(params, manager) {
+        let dataFlow = await (0, core_1.__)(Flow_1.default.findOne(params.flowId));
+        if (dataFlow) {
+            console.log("publish es:::::::::", dataFlow.publish);
+            if (dataFlow.publish === 'N') {
+                await this.validatePublishTemplate(params.flowId, manager, 'Y');
+                //change to active
+                dataFlow.publish = 'Y';
+            }
+            else {
+                await this.validatePublishTemplate(params.flowId, manager, 'N');
+                dataFlow.publish = 'N';
+            }
+            dataFlow.modifiedAt = new Date();
+            dataFlow.modifiedBy = this.user.username;
+            const updFlow = await (0, core_1.__)(manager.save(dataFlow));
+            return { success: true };
+        }
+        else {
+            return { success: false };
+        }
+    }
+    async validatePublishTemplate(flowId, manager, publish) {
+        if (publish == 'Y') {
+            const nodes = await Node_1.default.find({ flowId, isActive: true });
+            let res = '';
+            if (nodes.length < 2) {
+                throw new core_1.PxpError(400, 'Your template must have at least 2 steps. Please finish configuring it before publish');
+            }
+            return true;
+        }
+        else {
+            return true;
+        }
+    }
 };
 __decorate([
     (0, core_1.Get)(),
     (0, core_1.DbSettings)('Orm'),
     (0, core_1.ReadOnly)(true),
     (0, core_1.Log)(true),
+    (0, core_1.ApiDoc)(FlowNdApiDocs_1.flowGetDoc),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
@@ -830,6 +1164,7 @@ __decorate([
     (0, core_1.DbSettings)('Orm'),
     (0, core_1.ReadOnly)(false),
     (0, core_1.Log)(true),
+    (0, core_1.ApiDoc)(FlowNdApiDocs_1.flowDeleteFlowDoc),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
@@ -839,6 +1174,7 @@ __decorate([
     (0, core_1.DbSettings)('Orm'),
     (0, core_1.ReadOnly)(false),
     (0, core_1.Log)(true),
+    (0, core_1.ApiDoc)(FlowNdApiDocs_1.flowSaveFlowNameDoc),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
@@ -857,6 +1193,7 @@ __decorate([
     (0, core_1.DbSettings)('Orm'),
     (0, core_1.ReadOnly)(false),
     (0, core_1.Log)(true),
+    (0, core_1.ApiDoc)(FlowNdApiDocs_1.flowSaveFlowDoc),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
@@ -867,6 +1204,7 @@ __decorate([
     (0, core_1.DbSettings)('Orm'),
     (0, core_1.ReadOnly)(true),
     (0, core_1.Log)(true),
+    (0, core_1.ApiDoc)(FlowNdApiDocs_1.flowGetFlowRenderDoc),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
@@ -876,6 +1214,7 @@ __decorate([
     (0, core_1.DbSettings)('Orm'),
     (0, core_1.ReadOnly)(false),
     (0, core_1.Log)(true),
+    (0, core_1.ApiDoc)(FlowNdApiDocs_1.flowInsertEventFlowDoc),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
@@ -894,6 +1233,7 @@ __decorate([
     (0, core_1.DbSettings)('Orm'),
     (0, core_1.ReadOnly)(false),
     (0, core_1.Log)(true),
+    (0, core_1.ApiDoc)(FlowNdApiDocs_1.flowChangeStatusFlowDoc),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
@@ -907,7 +1247,27 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], Flow.prototype, "basicFlowList", null);
+__decorate([
+    (0, core_1.Get)(""),
+    (0, core_1.DbSettings)("Orm"),
+    (0, core_1.ReadOnly)(true),
+    (0, core_1.Log)(true),
+    (0, core_1.ApiDoc)(FlowNdApiDocs_1.flowListTemplatesDoc),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], Flow.prototype, "listTemplates", null);
+__decorate([
+    (0, core_1.Post)(),
+    (0, core_1.DbSettings)('Orm'),
+    (0, core_1.ReadOnly)(false),
+    (0, core_1.Log)(true),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
+    __metadata("design:returntype", Promise)
+], Flow.prototype, "changePublishTemplate", null);
 Flow = __decorate([
+    (0, core_1.ApiDocFor)('add', FlowNdApiDocs_1.flowAddDoc),
     (0, core_1.Model)('flow-nd/Flow')
 ], Flow);
 exports.default = Flow;

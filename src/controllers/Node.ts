@@ -10,18 +10,24 @@
  * 04-Sep-2023    SP08SEP23     Rensi Arteaga           add modifiedAt for flows
  * 29-Sep-2023    SP06OCT23     Mercedes Zambrana       Add validation when flow is on
  * 19-Jan-2025    8201489097    Favio Figueroa          Add Controller Validation
+ * 06-Nov-2026                     Rensi Arteaga         @ApiDoc for OpenAPI (spec 04)
  * ******************************************************************************
  */
 
 import {EntityManager, getManager, IsNull, Not} from 'typeorm';
 import NodeModel from '../entity/Node';
 import NodeConnectionModel from '../entity/NodeConnection';
-import {__, Controller, DbSettings, Log, Model, Post, PxpError, ReadOnly} from '@pxp-nd/core';
+import {__, Controller, DbSettings, Log, Model, Post, PxpError, ReadOnly, ApiDoc} from '@pxp-nd/core';
 import _ from 'lodash';
 import FieldMapEntity from "../entity/FieldMap";
 import OriginNameEntity from "../entity/OriginName";
 import axios from 'axios';
 import FlowModel from '../entity/Flow';
+import {
+  nodeAddActionConfigJsonDoc,
+  nodeAddDoc,
+  nodeGetParameterizedNodeDoc,
+} from '../helpers/FlowNdApiDocs';
 
 
 interface InterfaceParamsExecuteValidationController {
@@ -48,6 +54,7 @@ class Node extends Controller {
   @DbSettings('Orm')
   @ReadOnly(false)
   @Log(true)
+  @ApiDoc(nodeAddDoc)
   async add(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
     let node = new NodeModel();
     node.isInit = params.isInit;
@@ -89,6 +96,7 @@ class Node extends Controller {
   @DbSettings('Orm')
   @ReadOnly(false)
   @Log(true)
+  @ApiDoc(nodeAddActionConfigJsonDoc)
   async AddActionConfigJson(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
     let validated = { validated: true, msg: "SUCCESS" };
     let { nodeId: removed, __metadata: removed2, ...actionConfigJson } = params;
@@ -140,9 +148,15 @@ class Node extends Controller {
   @DbSettings('Orm')
   @ReadOnly(false)
   @Log(true)
+  @ApiDoc(nodeGetParameterizedNodeDoc)
   async getParameterizedNode(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
     
     _.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
+
+    const nid = Number(params.nodeId);
+    if (!Number.isInteger(nid) || nid < 1) {
+      throw new PxpError(400, 'nodeId is required and must be a positive integer');
+    }
 
     const { nodeId, flowId, substitutionsSchemaJson = {} } = params;
     const tNodeData =  __(NodeModel.findOne(nodeId));

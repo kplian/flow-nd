@@ -11,6 +11,9 @@
  *
  * Created at     : 2021-07-08 12:55:38
  * Last modified  :
+ *   ISSUE        DATE        NAME                DESCRIPTION
+ *  9141239986   16-May-2025  Mercedes Zambrana   Save flagName and FlagValue
+ *  EF-23        08-Oct-2026  Favio Figueroa      GET_LOCK instead of flag, skipped=200, axios timeout
  */
 
 import { EntityManager, getManager } from 'typeorm';
@@ -29,6 +32,7 @@ import Event from "../entity/Event";
 import Flow from "../entity/Flow";
 import Action from "../entity/Action";
 import FlowLog from "../entity/FlowLog";
+import { withDbLock } from '../helpers/dbLock';
 
 class FlowInstance extends Controller {
 
@@ -37,20 +41,15 @@ class FlowInstance extends Controller {
   @ReadOnly(false)
   @Log(true)
   async processPending(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
-    const flag = await GlobalData.findOne({ data : 'wf_processing_pending_flows_flag'});
-    if (flag){
-      if (flag.value == 'true') {
-          throw new PxpError(400, 'Already processing pending flows');
-      }
-      flag.value = 'true';
-      let flowInstanceIdProcessing = -1;
-      await getManager().save(flag);
+    let flowInstanceIdProcessing = -1;
+    const { acquired } = await withDbLock('wf_process_pending', async () => {
       try {
           await this.eventProcesss(manager);
           const maxFlows = await GlobalData.findOne({ data : 'wf_max_concurrent_flows_process'});
           const flowInstances = await manager.find(FlowInstanceModel, { take: (maxFlows && maxFlows.value) as unknown as number, where: [{ status: 'pending' }], order: { flowInstanceId: "ASC" }});
           for(const flowInstance of flowInstances) {
               flowInstanceIdProcessing = flowInstance.flowInstanceId;
+
               const node = await Node.findOne({ where: { actionId: flowInstance.actionId, flowId: flowInstance.flowId }});
               const CNodeInstance = new NodeInstanceController('flow-nd', NodeInstance);
               try {
@@ -70,25 +69,23 @@ class FlowInstance extends Controller {
                     {status: 'processed'});
           }
       } catch(error) {
-
-          flag.value = 'false';
-          await getManager().save(flag);
+          // The lock is released by withDbLock's finally block
           const log = new FlowLog();
           log.errorCustomMessage = `Error executing ${flowInstanceIdProcessing} in FlowInstance-> processPending `;
           log.errorMessage =  error.message;
           log.stackTrace = error.stack || '';
-          getManager().save(log);
+          await getManager().save(log).catch(e => console.error('[flow] FlowLog save failed', e.message));
           throw new PxpError(400, 'Error processing flow: ' + flowInstanceIdProcessing);
       }
-
-      flag.value = 'false';
-      await getManager().save(flag);
+    });
+    if (!acquired) {
+      return { success: true, skipped: true, reason: 'already running' };
     }
     return { success: true }
   }
 
   async eventProcesss(manager: EntityManager) {
-    
+
     const pendingEvents = await Event.find({ status: 'pending' });
 
     for (const newEvent of pendingEvents) {
@@ -105,6 +102,7 @@ class FlowInstance extends Controller {
           } = n;
           const executeView = `select * from ${originName} where ${originKey} = ${newEvent.dataId}`;
           const resExecuteView = await getManager().query(executeView);
+
           const flow = await __(Flow.findOne({ where: { flowId: n.flowId, isActive: 1, status: 'on' } }));
           if (
             flow && flow.vendorId == resExecuteView[0].vendor_id &&
@@ -133,7 +131,7 @@ class FlowInstance extends Controller {
         log.errorCustomMessage = `Error processing event ${newEvent.eventId} in FlowInstance-> eventProcesss `;
         log.errorMessage =  error.message;
         log.stackTrace = error.stack || '';
-        getManager().save(log);
+        await getManager().save(log).catch(e => console.error('[flow] FlowLog save failed', e.message));
       }
     }
   }
@@ -162,6 +160,31 @@ class FlowInstance extends Controller {
       }
     }
     return res;
+  }
+
+  @Post()
+  @DbSettings('Orm')
+  @ReadOnly(false)
+  @Log(true)
+  async insert(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
+    const { flowId, dataId, status, actionId, originName = '', originKey = '' , flagName, flagValue} = params;
+    let flowInstance = new FlowInstanceModel();
+    flowInstance.flowId = flowId;
+    flowInstance.dataId = dataId;
+    flowInstance.originName = originName;
+    flowInstance.originKey = originKey;
+    flowInstance.actionId = actionId;
+    flowInstance.status = status;
+    if (flagName !== undefined && flagValue !== undefined) {
+      flowInstance.flagName = flagName;
+      flowInstance.flagValue = flagValue;
+    }
+
+    flowInstance = await manager.save(
+      FlowInstanceModel,
+      flowInstance
+    );
+    return flowInstance;
   }
 }
 

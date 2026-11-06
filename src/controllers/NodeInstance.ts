@@ -11,6 +11,9 @@
  *
  * Created at     : 2021-07-08 12:55:38
  * Last modified  :
+ *  ISSUE         DATE           AUTHOR              DESCRIPTION
+ *  25-Apr-2025   8914754251     Mercedes Zambrana   Validate and use node?.action?.controllerFunction
+ *  08-Oct-2026   EF-23          Favio Figueroa      GET_LOCK instead of flag, skipped=200, axios timeout
  */
 
 import { EntityManager, getManager } from "typeorm";
@@ -31,11 +34,12 @@ import NodeConnection from "../entity/NodeConnection";
 import NodeInstanceModel from "../entity/NodeInstance";
 import Node from "../entity/Node";
 import FlowLog from "../entity/FlowLog";
-import axios from "axios";
+import axios, { Method } from "axios";
 import ActionType from "../entity/ActionType";
 import Action from "../entity/Action";
 import _ from "lodash";
 import FlowInstance from "../entity/FlowInstance";
+import { withDbLock } from "../helpers/dbLock";
 
 //TODO replace this flow-nd need tobe independent library
 import { GlobalData } from "@pxp-nd/common";
@@ -47,12 +51,15 @@ class NodeInstance extends Controller {
     _.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
     //todo after this we need to get the json variables and execute the view and conditions configured in the database
     const { node, flowInstance, eventNode } = params;
+
     try {
       const executeView = `select * from ${flowInstance.originName} where ${flowInstance.originKey} = ${flowInstance.dataId}`;
+
       const resExecuteView = await __(getManager().query(executeView));
       const resultFromOrigin = resExecuteView[0];
 
-      let mergeJson = {};
+      //let mergeJson = {};
+      let mergeJson: Record<string, any> = {};
       const {
         actionConfigJson,
         action: {
@@ -71,7 +78,13 @@ class NodeInstance extends Controller {
           ...(configJsonTemplateObject || {}), // first object must be of the node table
           ...(actionConfigJsonObject || {}),
           __resultFromOrigin: resultFromOrigin,
+          uniqueArgs: {
+            flowInstance: flowInstance.flowInstanceId,
+            nodeId: node.nodeId
+          }
         };
+
+
       }
 
       let nodeInstance = new NodeInstanceModel();
@@ -90,22 +103,66 @@ class NodeInstance extends Controller {
       } else {
         if (node.action.actionType.controller) {
           const data = "";
+          const res = await manager.save(NodeInstanceModel, nodeInstance);
+          const nodeInstanceId = res.nodeInstanceId;
 
-          const config = {
-            method: "post",
-            url: `http://localhost:${process.env.PORT}/api/${node.action.actionType.controller}`,
-            headers: {
-              Authorization: "" + process.env.TOKEN_PXP_ND + "",
-              "Content-Type": "application/json",
-            },
-            data: mergeJson,
-          };
 
-          // @ts-ignore
-          const resControllerAxios = await __(axios(config));
+          if (nodeInstanceId){
+            mergeJson.nodeInstanceId = nodeInstanceId;
+          }
+
+
+          if (!!node?.action?.controllerFunction) {
+
+            const config = {
+              method: "post" as Method,
+              url: `http://localhost:${process.env.PORT}/api/${node.action.controllerFunction}`,
+              headers: {
+                Authorization: "" + process.env.TOKEN_PXP_ND + "",
+                "Content-Type": "application/json",
+              },
+              data: mergeJson,
+              timeout: Number(process.env.FLOW_ACTION_TIMEOUT_MS || 30000),
+            };
+
+            const resControllerAxios = await __(axios(config));
+
+            if ('data' in resControllerAxios && resControllerAxios.data) {
+              const response = resControllerAxios.data;
+              if ('tokenId' in response && response.tokenId) {
+                nodeInstance.extraArgs = { tokenId: response.tokenId };
+                await manager.save(NodeInstanceModel, nodeInstance);
+              }
+
+            }
+
+          }else{
+            const config = {
+              method: "post" as Method,
+              url: `http://localhost:${process.env.PORT}/api/${node.action.actionType.controller}`,
+              headers: {
+                Authorization: "" + process.env.TOKEN_PXP_ND + "",
+                "Content-Type": "application/json",
+              },
+              data: mergeJson,
+              timeout: Number(process.env.FLOW_ACTION_TIMEOUT_MS || 30000),
+            };
+
+            const resControllerAxios = await __(axios(config));
+
+            if ('data' in resControllerAxios && resControllerAxios.data) {
+              const response = resControllerAxios.data;
+              if ('tokenId' in response && response.tokenId) {
+                nodeInstance.extraArgs = { tokenId: response.tokenId };
+                await manager.save(NodeInstanceModel, nodeInstance);
+              }
+
+            }
+          }
+
         }
 
-        await manager.save(NodeInstanceModel, nodeInstance);
+
         // @ts-ignore
         const nodeConnectionList = await __(
           NodeConnection.find({ where: { nodeIdMaster: node.nodeId } })
@@ -131,7 +188,7 @@ class NodeInstance extends Controller {
       log.errorCustomMessage = `Error executing ${flowInstance.flowInstanceId} in NodeInstance-> RecursiveInstance `;
       log.errorMessage =  error.message;
       log.stackTrace = error.stack || '';
-      getManager().save(log);
+      await getManager().save(log).catch(e => console.error('[flow] FlowLog save failed', e.message));
     }
 
     return {};
@@ -145,16 +202,8 @@ class NodeInstance extends Controller {
     params: Record<string, any>,
     manager: EntityManager
   ): Promise<unknown> {
-    const flag = await GlobalData.findOne({
-      data: "wf_processing_delay_nodes_flag",
-    });
-    if (flag) {
-      if (flag.value == "true") {
-        throw new PxpError(400, "Already processing pending flows");
-      }
-      flag.value = "true";
-      await getManager().save(flag);
-      let nodeInstanceIdProcessing = -1;
+    let nodeInstanceIdProcessing = -1;
+    const { acquired } = await withDbLock("wf_process_delay", async () => {
       try {
         const maxNodes = await GlobalData.findOne({
           data: "wf_max_concurrent_delay_process",
@@ -220,15 +269,15 @@ class NodeInstance extends Controller {
           }
         }
       } catch (error) {
-        flag.value = "false";
-        await getManager().save(flag);
+        // The lock is released by withDbLock's finally block
         throw new PxpError(
           400,
           "Error processing node: " + nodeInstanceIdProcessing
         );
       }
-      flag.value = "false";
-      await getManager().save(flag);
+    });
+    if (!acquired) {
+      return { success: true, skipped: true, reason: "already running" };
     }
     return { success: true };
   }

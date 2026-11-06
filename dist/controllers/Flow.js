@@ -20,6 +20,7 @@
  * 28-Sep-2023    SP06OCT23     Mercedes Zambrana      Add Validation when change off status (validateFlow, deleteflow, saveFlow, saveflowName)
  * 07-Feb-2025    8353064698    Mercedes Zambrana      Add validation for opt in page when flow si funnel change
  * 18-Feb-2025    8501163144    Mercedes Zambrana      Add publish filter
+ * 06-Nov-2026                     Rensi Arteaga         @ApiDoc for OpenAPI (spec 04)
  * ******************************************************************************
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -69,8 +70,13 @@ const FlowInstance_1 = __importDefault(require("../entity/FlowInstance"));
 const Node_2 = __importDefault(require("./Node"));
 const axios_1 = __importDefault(require("axios"));
 //import {configFacebookStrategy} from "./passport-facebook";
+const FlowNdApiDocs_1 = require("../helpers/FlowNdApiDocs");
 let Flow = class Flow extends core_1.Controller {
     async get(params) {
+        const fid = Number(params.flowId);
+        if (!Number.isInteger(fid) || fid < 1) {
+            throw new core_1.PxpError(400, 'flowId is required and must be a positive integer');
+        }
         const nodes = await Node_1.default.find({ flowId: params.flowId });
         const restNodes = [];
         for (let node of nodes) {
@@ -477,6 +483,10 @@ let Flow = class Flow extends core_1.Controller {
     }
     async getFlowRender(params) {
         var _a;
+        const fid = Number(params.flowId);
+        if (!Number.isInteger(fid) || fid < 1) {
+            throw new core_1.PxpError(400, 'flowId is required and must be a positive integer');
+        }
         const flow = await (0, typeorm_1.getManager)().findOne(Flow_1.default, params.flowId);
         const totalNodes = await (0, typeorm_1.getManager)()
             .createQueryBuilder(Node_1.default, "n")
@@ -782,6 +792,15 @@ let Flow = class Flow extends core_1.Controller {
         const filter = (params === null || params === void 0 ? void 0 : params.filter) ? JSON.parse(params === null || params === void 0 ? void 0 : params.filter) : null;
         const filters = (filter === null || filter === void 0 ? void 0 : filter.items) || [];
         const logicOperator = ((_a = filter === null || filter === void 0 ? void 0 : filter.logicOperator) === null || _a === void 0 ? void 0 : _a.toUpperCase()) || 'AND';
+        const allowedSort = ['flowId', 'name', 'createdAt', 'modifiedAt'];
+        const allowedDir = ['ASC', 'DESC'];
+        const sortCol = params.sort != null && params.sort !== '' ? String(params.sort) : 'flowId';
+        const dirVal = params.dir != null && params.dir !== ''
+            ? String(params.dir).toUpperCase()
+            : 'ASC';
+        if (!allowedSort.includes(sortCol) || !allowedDir.includes(dirVal)) {
+            throw new core_1.PxpError(400, 'sort and dir must be allowed values (whitelist for SQL orderBy)');
+        }
         const queryBuilder = await (0, typeorm_1.getManager)()
             .createQueryBuilder()
             .select([
@@ -888,7 +907,7 @@ let Flow = class Flow extends core_1.Controller {
         // Sorting and pagination
         //queryBuilder.orderBy(`f.${params.sort}`, params.dir).skip(params.start).take(params.limit);
         // Sorting and pagination
-        queryBuilder.orderBy(`f.${params.sort}`, params.dir);
+        queryBuilder.orderBy(`f.${sortCol}`, dirVal);
         // Agrega manualmente la cláusula LIMIT y OFFSET
         queryBuilder.limit(params.limit).offset(params.start);
         const data = await queryBuilder.getRawMany();
@@ -929,6 +948,15 @@ let Flow = class Flow extends core_1.Controller {
         const filters = (filter === null || filter === void 0 ? void 0 : filter.items) || [];
         const logicOperator = ((_a = filter === null || filter === void 0 ? void 0 : filter.logicOperator) === null || _a === void 0 ? void 0 : _a.toUpperCase()) || "AND";
         const publish = params._publish;
+        const allowedSort = ["flowId", "name", "createdAt", "modifiedAt"];
+        const allowedDir = ["ASC", "DESC"];
+        const sortCol = params.sort != null && params.sort !== "" ? String(params.sort) : "flowId";
+        const dirVal = params.dir != null && params.dir !== ""
+            ? String(params.dir).toUpperCase()
+            : "ASC";
+        if (!allowedSort.includes(sortCol) || !allowedDir.includes(dirVal)) {
+            throw new core_1.PxpError(400, "sort and dir must be allowed values (whitelist for SQL orderBy)");
+        }
         const queryBuilder = await (0, typeorm_1.getManager)()
             .createQueryBuilder()
             .select([
@@ -1040,7 +1068,7 @@ let Flow = class Flow extends core_1.Controller {
             "f.status",
         ]);
         // Ordenamiento y paginación
-        queryBuilder.orderBy(`f.${params.sort || "flowId"}`, params.dir || "ASC");
+        queryBuilder.orderBy(`f.${sortCol}`, dirVal);
         queryBuilder.limit(params.limit || 50).offset(params.start || 0);
         // Obtener los datos
         const data = await queryBuilder.getRawMany();
@@ -1117,6 +1145,7 @@ __decorate([
     (0, core_1.DbSettings)('Orm'),
     (0, core_1.ReadOnly)(true),
     (0, core_1.Log)(true),
+    (0, core_1.ApiDoc)(FlowNdApiDocs_1.flowGetDoc),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
@@ -1135,6 +1164,7 @@ __decorate([
     (0, core_1.DbSettings)('Orm'),
     (0, core_1.ReadOnly)(false),
     (0, core_1.Log)(true),
+    (0, core_1.ApiDoc)(FlowNdApiDocs_1.flowDeleteFlowDoc),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
@@ -1144,6 +1174,7 @@ __decorate([
     (0, core_1.DbSettings)('Orm'),
     (0, core_1.ReadOnly)(false),
     (0, core_1.Log)(true),
+    (0, core_1.ApiDoc)(FlowNdApiDocs_1.flowSaveFlowNameDoc),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
@@ -1162,6 +1193,7 @@ __decorate([
     (0, core_1.DbSettings)('Orm'),
     (0, core_1.ReadOnly)(false),
     (0, core_1.Log)(true),
+    (0, core_1.ApiDoc)(FlowNdApiDocs_1.flowSaveFlowDoc),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
@@ -1172,6 +1204,7 @@ __decorate([
     (0, core_1.DbSettings)('Orm'),
     (0, core_1.ReadOnly)(true),
     (0, core_1.Log)(true),
+    (0, core_1.ApiDoc)(FlowNdApiDocs_1.flowGetFlowRenderDoc),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
@@ -1181,6 +1214,7 @@ __decorate([
     (0, core_1.DbSettings)('Orm'),
     (0, core_1.ReadOnly)(false),
     (0, core_1.Log)(true),
+    (0, core_1.ApiDoc)(FlowNdApiDocs_1.flowInsertEventFlowDoc),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
@@ -1199,6 +1233,7 @@ __decorate([
     (0, core_1.DbSettings)('Orm'),
     (0, core_1.ReadOnly)(false),
     (0, core_1.Log)(true),
+    (0, core_1.ApiDoc)(FlowNdApiDocs_1.flowChangeStatusFlowDoc),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, typeorm_1.EntityManager]),
     __metadata("design:returntype", Promise)
@@ -1217,6 +1252,7 @@ __decorate([
     (0, core_1.DbSettings)("Orm"),
     (0, core_1.ReadOnly)(true),
     (0, core_1.Log)(true),
+    (0, core_1.ApiDoc)(FlowNdApiDocs_1.flowListTemplatesDoc),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
@@ -1231,6 +1267,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], Flow.prototype, "changePublishTemplate", null);
 Flow = __decorate([
+    (0, core_1.ApiDocFor)('add', FlowNdApiDocs_1.flowAddDoc),
     (0, core_1.Model)('flow-nd/Flow')
 ], Flow);
 exports.default = Flow;

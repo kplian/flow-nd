@@ -19,6 +19,7 @@
  * 28-Sep-2023    SP06OCT23     Mercedes Zambrana      Add Validation when change off status (validateFlow, deleteflow, saveFlow, saveflowName)
  * 07-Feb-2025    8353064698    Mercedes Zambrana      Add validation for opt in page when flow si funnel change
  * 18-Feb-2025    8501163144    Mercedes Zambrana      Add publish filter
+ * 06-Nov-2026                     Rensi Arteaga         @ApiDoc for OpenAPI (spec 04)
  * ******************************************************************************
  */
 
@@ -26,7 +27,7 @@ import { EntityManager, getManager, In , FindManyOptions, SelectQueryBuilder } f
 
 import {
   Controller,
-  Model, __, Log, Post, DbSettings, ReadOnly, Get, PxpError
+  Model, __, Log, Post, DbSettings, ReadOnly, Get, PxpError, ApiDoc, ApiDocFor
 } from '@pxp-nd/core';
 import * as _ from 'lodash';
 import NodeModel from '../entity/Node';
@@ -39,7 +40,19 @@ import NodeController from './Node';
 import axios, { AxiosRequestConfig } from 'axios';
 //import {configFacebookStrategy} from "./passport-facebook";
 
+import {
+  flowAddDoc,
+  flowChangeStatusFlowDoc,
+  flowDeleteFlowDoc,
+  flowGetDoc,
+  flowGetFlowRenderDoc,
+  flowInsertEventFlowDoc,
+  flowListTemplatesDoc,
+  flowSaveFlowDoc,
+  flowSaveFlowNameDoc,
+} from '../helpers/FlowNdApiDocs';
 
+@ApiDocFor('add', flowAddDoc)
 @Model('flow-nd/Flow')
 class Flow extends Controller {
 
@@ -47,7 +60,12 @@ class Flow extends Controller {
   @DbSettings('Orm')
   @ReadOnly(true)
   @Log(true)
+  @ApiDoc(flowGetDoc)
   async get(params: Record<string, any>): Promise<unknown> {
+    const fid = Number(params.flowId);
+    if (!Number.isInteger(fid) || fid < 1) {
+      throw new PxpError(400, 'flowId is required and must be a positive integer');
+    }
     const nodes = await NodeModel.find({ flowId: params.flowId });
     const restNodes = [];
     for (let node of nodes) {
@@ -175,6 +193,7 @@ class Flow extends Controller {
   @DbSettings('Orm')
   @ReadOnly(false)
   @Log(true)
+  @ApiDoc(flowDeleteFlowDoc)
   async deleteFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
     let dataFlow = await __(FlowModel.findOne(params.flowId));
 
@@ -237,6 +256,7 @@ class Flow extends Controller {
   @DbSettings('Orm')
   @ReadOnly(false)
   @Log(true)
+  @ApiDoc(flowSaveFlowNameDoc)
   async saveFlowName(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
     let dataFlow = await __(FlowModel.findOne(params.flowId)); 
     if (dataFlow) {
@@ -310,6 +330,7 @@ class Flow extends Controller {
   @DbSettings('Orm')
   @ReadOnly(false)
   @Log(true)
+  @ApiDoc(flowSaveFlowDoc)
   async saveFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
 
     let nodeRefIds = params.board.columns['2-column-nodes-configured'].taskIds;
@@ -581,7 +602,12 @@ class Flow extends Controller {
   @DbSettings('Orm')
   @ReadOnly(true)
   @Log(true)
+  @ApiDoc(flowGetFlowRenderDoc)
   async getFlowRender(params: Record<string, any>): Promise<unknown> {
+    const fid = Number(params.flowId);
+    if (!Number.isInteger(fid) || fid < 1) {
+      throw new PxpError(400, 'flowId is required and must be a positive integer');
+    }
 
     const flow = await getManager().findOne(FlowModel, params.flowId as number);
     const totalNodes =  await getManager()
@@ -753,6 +779,7 @@ class Flow extends Controller {
   @DbSettings('Orm')
   @ReadOnly(false)
   @Log(true)
+  @ApiDoc(flowInsertEventFlowDoc)
   async insertEventFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
 
     let dataFlow = await __(FlowModel.findOne(params.flowId));
@@ -842,6 +869,7 @@ class Flow extends Controller {
   @DbSettings('Orm')
   @ReadOnly(false)
   @Log(true)
+  @ApiDoc(flowChangeStatusFlowDoc)
   async changeStatusFlow(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
 
     let dataFlow = await __(FlowModel.findOne(params.flowId));
@@ -984,6 +1012,21 @@ class Flow extends Controller {
     const filters = filter?.items || [];
     const logicOperator = filter?.logicOperator?.toUpperCase() || 'AND';
 
+    const allowedSort = ['flowId', 'name', 'createdAt', 'modifiedAt'];
+    const allowedDir = ['ASC', 'DESC'];
+    const sortCol =
+      params.sort != null && params.sort !== '' ? String(params.sort) : 'flowId';
+    const dirVal =
+      params.dir != null && params.dir !== ''
+        ? String(params.dir).toUpperCase()
+        : 'ASC';
+    if (!allowedSort.includes(sortCol) || !allowedDir.includes(dirVal)) {
+      throw new PxpError(
+        400,
+        'sort and dir must be allowed values (whitelist for SQL orderBy)'
+      );
+    }
+
     const queryBuilder:any = await getManager()
         .createQueryBuilder()
           .select([
@@ -1102,7 +1145,7 @@ class Flow extends Controller {
       //queryBuilder.orderBy(`f.${params.sort}`, params.dir).skip(params.start).take(params.limit);
 
     // Sorting and pagination
-    queryBuilder.orderBy(`f.${params.sort}`, params.dir);
+    queryBuilder.orderBy(`f.${sortCol}`, dirVal);
 
     // Agrega manualmente la cláusula LIMIT y OFFSET
     queryBuilder.limit(params.limit).offset(params.start);
@@ -1152,6 +1195,7 @@ class Flow extends Controller {
 @DbSettings("Orm")
 @ReadOnly(true)
 @Log(true)
+@ApiDoc(flowListTemplatesDoc)
 async listTemplates(params: Record<string, any>): Promise<unknown> {
   const isActive = params._isActive;
   const type = params._type || "template"; // Filtrar solo templates
@@ -1162,6 +1206,20 @@ async listTemplates(params: Record<string, any>): Promise<unknown> {
   const filters = filter?.items || [];
   const logicOperator = filter?.logicOperator?.toUpperCase() || "AND";
   const publish = params._publish;
+  const allowedSort = ["flowId", "name", "createdAt", "modifiedAt"];
+  const allowedDir = ["ASC", "DESC"];
+  const sortCol =
+    params.sort != null && params.sort !== "" ? String(params.sort) : "flowId";
+  const dirVal =
+    params.dir != null && params.dir !== ""
+      ? String(params.dir).toUpperCase()
+      : "ASC";
+  if (!allowedSort.includes(sortCol) || !allowedDir.includes(dirVal)) {
+    throw new PxpError(
+      400,
+      "sort and dir must be allowed values (whitelist for SQL orderBy)"
+    );
+  }
   const queryBuilder: any = await getManager()
     .createQueryBuilder()
     .select([
@@ -1280,7 +1338,7 @@ queryBuilder.groupBy([
 ]);
 
 // Ordenamiento y paginación
-queryBuilder.orderBy(`f.${params.sort || "flowId"}`, params.dir || "ASC");
+queryBuilder.orderBy(`f.${sortCol}`, dirVal);
 queryBuilder.limit(params.limit || 50).offset(params.start || 0);
 
 // Obtener los datos

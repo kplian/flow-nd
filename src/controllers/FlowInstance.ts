@@ -33,6 +33,7 @@ import Flow from "../entity/Flow";
 import Action from "../entity/Action";
 import FlowLog from "../entity/FlowLog";
 import { withDbLock } from '../helpers/dbLock';
+import { selectByIdent } from '../helpers/sqlIdent';
 
 class FlowInstance extends Controller {
 
@@ -100,8 +101,7 @@ class FlowInstance extends Controller {
           const {
             action: { originName, originKey },
           } = n;
-          const executeView = `select * from ${originName} where ${originKey} = ${newEvent.dataId}`;
-          const resExecuteView = await getManager().query(executeView);
+          const resExecuteView = await selectByIdent(getManager(), originName, originKey, newEvent.dataId);
 
           const flow = await __(Flow.findOne({ where: { flowId: n.flowId, isActive: 1, status: 'on' } }));
           if (

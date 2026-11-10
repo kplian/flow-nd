@@ -1,12 +1,12 @@
 {
   "name": "@pxp-nd/flow",
-  "version": "1.1.31",
+  "version": "1.1.32",
   "description": "Workflow module for pxp-nd framework",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "prepublish": "tsc",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest --runInBand",
     "build": "rimraf ./dist && tsc",
     "dev:publish": "yalc publish",
     "prod:publish": "npm publish",
@@ -24,6 +24,13 @@
   ],
   "author": "Kplian",
   "license": "ISC",
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": ["<rootDir>/test"],
+    "testTimeout": 30000,
+    "globals": { "ts-jest": { "tsconfig": "<rootDir>/test/tsconfig.json" } }
+  },
   "bugs": {
     "url": "https://github.com/kplian/flow-nd/issues"
   },
@@ -31,6 +38,9 @@
   "devDependencies": {
     "@types/lodash": "^4.14.172",
     "@types/node": "^16.4.13",
+    "@types/jest": "^27.5.2",
+    "jest": "^27.5.1",
+    "ts-jest": "^27.1.5",
     "rimraf": "^3.0.2",
     "tsc-watch": "^4.6.2",
     "typescript": "^4.9.5"

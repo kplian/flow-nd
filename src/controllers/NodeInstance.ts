@@ -40,6 +40,7 @@ import Action from "../entity/Action";
 import _ from "lodash";
 import FlowInstance from "../entity/FlowInstance";
 import { withDbLock } from "../helpers/dbLock";
+import { selectByIdent } from "../helpers/sqlIdent";
 
 //TODO replace this flow-nd need tobe independent library
 import { GlobalData } from "@pxp-nd/common";
@@ -53,9 +54,9 @@ class NodeInstance extends Controller {
     const { node, flowInstance, eventNode } = params;
 
     try {
-      const executeView = `select * from ${flowInstance.originName} where ${flowInstance.originKey} = ${flowInstance.dataId}`;
-
-      const resExecuteView = await __(getManager().query(executeView));
+      const originName = node?.action?.originName ?? flowInstance.originName;
+      const originKey = node?.action?.originKey ?? flowInstance.originKey;
+      const resExecuteView = await __(selectByIdent(getManager(), originName, originKey, flowInstance.dataId));
       const resultFromOrigin = resExecuteView[0];
 
       //let mergeJson = {};

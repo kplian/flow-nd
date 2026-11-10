@@ -37,6 +37,7 @@ import FlowModel from '../entity/Flow';
 import FlowInstanceModel from '../entity/FlowInstance';
 import NodeInstanceModel from '../entity/NodeInstance';
 import NodeController from './Node';
+import { flowFilterColumn } from '../helpers/flowFilter';
 import axios, { AxiosRequestConfig } from 'axios';
 //import {configFacebookStrategy} from "./passport-facebook";
 
@@ -209,17 +210,19 @@ class Flow extends Controller {
       const updFlow = await __(manager.save(dataFlow));
 
       if (updFlow){
-        let flowInstance =  `UPDATE twf_flow_instance SET
-            is_active = 'N' WHERE flow_id = ${updFlow.flowId}`;
-        await manager.query(flowInstance);
+        await manager.query(
+          `UPDATE twf_flow_instance SET is_active = 'N' WHERE flow_id = ?`,
+          [updFlow.flowId],
+        );
 
         const nodesToInact = await manager.find(NodeModel, { flowId: updFlow.flowId , isActive:true});
 
         if (nodesToInact.length > 0){
 
-        let flowNode = `UPDATE twf_node SET
-            is_active = 'N' WHERE flow_id = ${updFlow.flowId}`;
-        await manager.query(flowNode);
+        await manager.query(
+          `UPDATE twf_node SET is_active = 'N' WHERE flow_id = ?`,
+          [updFlow.flowId],
+        );
 
 
         const nodesToInact = await manager.find(NodeModel, { flowId: updFlow.flowId });
@@ -232,9 +235,10 @@ class Flow extends Controller {
         const originalNodeCIds = connectionsToInact.map((node) => node.nodeConnectionId);
 
           if (originalNodeCIds.length > 0){
-        let flowNodeC = `UPDATE twf_node_connection SET
-            is_active = 'N' WHERE node_connection_id in ( ${originalNodeCIds})`;
-        await manager.query(flowNodeC);
+        await manager.query(
+          `UPDATE twf_node_connection SET is_active = 'N' WHERE node_connection_id IN (?)`,
+          [originalNodeCIds],
+        );
           }
 
         }
@@ -411,9 +415,12 @@ class Flow extends Controller {
 
 
 
-                 let flowNodeC = await manager.query(`DELETE
-                                                       from twf_node_connection
-                                                       WHERE node_connection_id = ${originalNodeCIds}`);
+                 if (originalNodeCIds.length > 0) {
+                   await manager.query(
+                     `DELETE FROM twf_node_connection WHERE node_connection_id IN (?)`,
+                     [originalNodeCIds],
+                   );
+                 }
 
                }
 
@@ -442,10 +449,13 @@ class Flow extends Controller {
           if (dataFlow.status=='off'){
             allowModify=true;
             //If there are some nodes in node_connections after delete all records sent, to inactive node
-            let connectNoDel = await getManager().query(`SELECT n.node_id
-                                                    from twf_node_connection nd
-                                                           inner join twf_node n on n.node_id = nd.node_id_child
-                                                    WHERE n.node_id = ${nodeDelId}`);
+            let connectNoDel = await getManager().query(
+              `SELECT n.node_id
+                 FROM twf_node_connection nd
+                 INNER JOIN twf_node n ON n.node_id = nd.node_id_child
+                 WHERE n.node_id = ?`,
+              [nodeDelId],
+            );
 
             const currentNodesIds = connectNoDel.map((record: { node_id: number }) => record.node_id);
 
@@ -456,10 +466,10 @@ class Flow extends Controller {
             if (nodesToRemove.length > 0) {
               const delNodeConnect = await manager.delete(NodeConnectionModel, {nodeIdChild: nodesToRemove[0]});
               if (delNodeConnect) {
-                let dNode = `UPDATE twf_node
-                        SET is_active = 'N'
-                        WHERE node_id = ${nodesToRemove[0]}`;
-                await manager.query(dNode);
+                await manager.query(
+                  `UPDATE twf_node SET is_active = 'N' WHERE node_id = ?`,
+                  [nodesToRemove[0]],
+                );
               }
             }
 
@@ -1072,7 +1082,7 @@ class Flow extends Controller {
     const applyDynamicFilters = (queryBuilder: any, filters: any[], logicOperator: string) => {
       filters.forEach((filter: any, index: number) => {
         const { field, operator, value } = filter;
-        const queryField = `f.${field}`;
+        const queryField = `f.${flowFilterColumn(field)}`;
         const parameterName = `filterValue${index}`;
         let condition: string;
 
@@ -1273,7 +1283,7 @@ if (allowedColumns.includes(params.genericFilterFields)) {
   const applyDynamicFilters = (queryBuilder: any, filters: any[], logicOperator: string) => {
     filters.forEach((filter: any, index: number) => {
       const { field, operator, value } = filter;
-      const queryField = `f.${field}`;
+      const queryField = `f.${flowFilterColumn(field)}`;
       const parameterName = `filterValue${index}`;
       let condition: string;
 

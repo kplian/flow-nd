@@ -28,6 +28,8 @@ import {
   nodeAddDoc,
   nodeGetParameterizedNodeDoc,
 } from '../helpers/FlowNdApiDocs';
+import { selectByIdent } from '../helpers/sqlIdent';
+import { harmonyVendorId } from '../helpers/sessionVendor';
 
 
 interface InterfaceParamsExecuteValidationController {
@@ -45,8 +47,7 @@ class Node extends Controller {
 
   async getNodeData(node: any, dataId: any, manager: EntityManager) {
     const {action: {originName, originKey}} = node;
-    const executeView = `select * from ${originName} where ${originKey} = ${dataId}`;
-    const resExecuteView = await __(manager.query(executeView));
+    const resExecuteView = await __(selectByIdent(manager, originName, originKey, dataId));
     return JSON.stringify(resExecuteView[0]);
   }
 
@@ -158,7 +159,15 @@ class Node extends Controller {
       throw new PxpError(400, 'nodeId is required and must be a positive integer');
     }
 
-    const { nodeId, flowId, substitutionsSchemaJson = {} } = params;
+    const { nodeId, flowId } = params;
+    const requestedSubstitutions =
+      params.substitutionsSchemaJson && typeof params.substitutionsSchemaJson === 'object'
+        ? { ...params.substitutionsSchemaJson }
+        : {};
+    const sessionVendor = harmonyVendorId(this.user);
+    const substitutionsSchemaJson = sessionVendor != null
+      ? { ...requestedSubstitutions, vendorId: sessionVendor }
+      : requestedSubstitutions;
     const tNodeData =  __(NodeModel.findOne(nodeId));
     const nodeData = await tNodeData;
 
@@ -324,20 +333,21 @@ class Node extends Controller {
   @ReadOnly(false)
   @Log(true)
   async executeActionJson(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
-    const {nodeId, originName, originKey, fromValues} = params;
-    // we need to get the value from merge values with originKey
+    const {nodeId, fromValues} = params;
+    const nodeRow = await __(NodeModel.findOne({ where: { nodeId }, relations: ['action'] } as any));
+    if (!nodeRow || !nodeRow.action) {
+      throw new PxpError(400, 'Invalid origin');
+    }
     const getParameterizedNodeData = await __(this.getParameterizedNode({nodeId: nodeId }, manager));
 
     const { mergeValues } = getParameterizedNodeData;
-    const findOriginValue = Object.entries(mergeValues).find(([nameValue]) => fromValues === nameValue);
-
-    const resValueObject = Object.fromEntries([findOriginValue]);
-    const originValue = resValueObject[fromValues];
-    const executeViewString = `select * from ${originName} where ${originKey} = ${originValue}`;
-    const resExecuteView = await getManager().query(executeViewString);
-
-    /*const executeView = `select * from ${originName} where ${originKey} = ${newEvent.dataId}`;
-    const resExecuteView = await getManager().query(executeView);*/
+    const originValue = mergeValues ? (mergeValues as Record<string, unknown>)[fromValues] : undefined;
+    const resExecuteView = await selectByIdent(
+      getManager(),
+      nodeRow.action.originName,
+      nodeRow.action.originKey,
+      originValue,
+    );
     return {
       ...resExecuteView[0]
     }

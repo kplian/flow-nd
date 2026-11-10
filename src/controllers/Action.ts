@@ -9,14 +9,14 @@
  * @author Favio Figueroa
  *
  * Created at     : 2021-07-08 12:55:38
- * Last modified  :
+ * Last modified  : 2026-11-06 — Rensi Arteaga — @ApiDoc for OpenAPI (spec 04)
  */
 
 import { EntityManager, getManager } from 'typeorm';
 
 import {
   Controller,
-  Model, __, Log, Post, DbSettings, ReadOnly, Get
+  Model, __, Log, Post, DbSettings, ReadOnly, Get, ApiDoc, PxpError
 } from '@pxp-nd/core';
 import NodeModel from "../entity/Node";
 import NodeConnectionModel from "../entity/NodeConnection";
@@ -26,17 +26,22 @@ import ActionEntity from "../entity/Action";
 import ActionTypeEntity from "../entity/ActionType";
 import FieldMapEntity from '../entity/FieldMap';
 import OriginNameEntity from '../entity/OriginName';
+import { actionGetActionsDoc, actionGetFieldMapByActionDoc } from '../helpers/FlowNdApiDocs';
 
 @Model('flow-nd/Action')
 class Action extends Controller {
 
     @Get()
     @DbSettings('Orm')
-    @ReadOnly(false)
+    @ReadOnly(true)
     @Log(true)
+    @ApiDoc(actionGetFieldMapByActionDoc)
     async getFieldMapByAction(params: Record<string, any>, manager: EntityManager): Promise<unknown> {
 
         const { originName } = params;
+        if (originName == null || String(originName).trim() === '') {
+            throw new PxpError(400, 'originName is required');
+        }
         const fieldMapData = await __(manager.createQueryBuilder(FieldMapEntity, 'fm')
             .innerJoin(OriginNameEntity, 'on', 'on.originNameId = fm.originNameId')
             .where("on.name = :n ", {n: originName})
@@ -49,6 +54,7 @@ class Action extends Controller {
   @DbSettings('Orm')
   @ReadOnly(true)
   @Log(true)
+  @ApiDoc(actionGetActionsDoc)
   async getActions(params: Record<string, any>,  manager: EntityManager): Promise<unknown> {
 
     const { actionTypeName, actionId } = params;

@@ -68,6 +68,7 @@ const NodeConnection_1 = __importDefault(require("../entity/NodeConnection"));
 const Flow_1 = __importDefault(require("../entity/Flow"));
 const FlowInstance_1 = __importDefault(require("../entity/FlowInstance"));
 const Node_2 = __importDefault(require("./Node"));
+const flowFilter_1 = require("../helpers/flowFilter");
 const axios_1 = __importDefault(require("axios"));
 //import {configFacebookStrategy} from "./passport-facebook";
 const FlowNdApiDocs_1 = require("../helpers/FlowNdApiDocs");
@@ -192,14 +193,10 @@ let Flow = class Flow extends core_1.Controller {
             dataFlow.modifiedBy = this.user.username;
             const updFlow = await (0, core_1.__)(manager.save(dataFlow));
             if (updFlow) {
-                let flowInstance = `UPDATE twf_flow_instance SET
-            is_active = 'N' WHERE flow_id = ${updFlow.flowId}`;
-                await manager.query(flowInstance);
+                await manager.query(`UPDATE twf_flow_instance SET is_active = 'N' WHERE flow_id = ?`, [updFlow.flowId]);
                 const nodesToInact = await manager.find(Node_1.default, { flowId: updFlow.flowId, isActive: true });
                 if (nodesToInact.length > 0) {
-                    let flowNode = `UPDATE twf_node SET
-            is_active = 'N' WHERE flow_id = ${updFlow.flowId}`;
-                    await manager.query(flowNode);
+                    await manager.query(`UPDATE twf_node SET is_active = 'N' WHERE flow_id = ?`, [updFlow.flowId]);
                     const nodesToInact = await manager.find(Node_1.default, { flowId: updFlow.flowId });
                     const originalNodeIds = nodesToInact.map((node) => node.nodeId);
                     const connectionsToInact = await manager.find(NodeConnection_1.default, {
@@ -207,9 +204,7 @@ let Flow = class Flow extends core_1.Controller {
                     });
                     const originalNodeCIds = connectionsToInact.map((node) => node.nodeConnectionId);
                     if (originalNodeCIds.length > 0) {
-                        let flowNodeC = `UPDATE twf_node_connection SET
-            is_active = 'N' WHERE node_connection_id in ( ${originalNodeCIds})`;
-                        await manager.query(flowNodeC);
+                        await manager.query(`UPDATE twf_node_connection SET is_active = 'N' WHERE node_connection_id IN (?)`, [originalNodeCIds]);
                     }
                 }
                 return { success: true };
@@ -328,9 +323,9 @@ let Flow = class Flow extends core_1.Controller {
                         });
                         if (connectionsToDel) {
                             const originalNodeCIds = connectionsToDel.map((node) => node.nodeConnectionId);
-                            let flowNodeC = await manager.query(`DELETE
-                                                       from twf_node_connection
-                                                       WHERE node_connection_id = ${originalNodeCIds}`);
+                            if (originalNodeCIds.length > 0) {
+                                await manager.query(`DELETE FROM twf_node_connection WHERE node_connection_id IN (?)`, [originalNodeCIds]);
+                            }
                         }
                     }
                 }
@@ -349,9 +344,9 @@ let Flow = class Flow extends core_1.Controller {
                     allowModify = true;
                     //If there are some nodes in node_connections after delete all records sent, to inactive node
                     let connectNoDel = await (0, typeorm_1.getManager)().query(`SELECT n.node_id
-                                                    from twf_node_connection nd
-                                                           inner join twf_node n on n.node_id = nd.node_id_child
-                                                    WHERE n.node_id = ${nodeDelId}`);
+                 FROM twf_node_connection nd
+                 INNER JOIN twf_node n ON n.node_id = nd.node_id_child
+                 WHERE n.node_id = ?`, [nodeDelId]);
                     const currentNodesIds = connectNoDel.map((record) => record.node_id);
                     // Get nodes to remove
                     const nodesToRemove = currentNodesIds.filter((nodeId) => !taskIds.includes(nodeId.toString()));
@@ -359,10 +354,7 @@ let Flow = class Flow extends core_1.Controller {
                     if (nodesToRemove.length > 0) {
                         const delNodeConnect = await manager.delete(NodeConnection_1.default, { nodeIdChild: nodesToRemove[0] });
                         if (delNodeConnect) {
-                            let dNode = `UPDATE twf_node
-                        SET is_active = 'N'
-                        WHERE node_id = ${nodesToRemove[0]}`;
-                            await manager.query(dNode);
+                            await manager.query(`UPDATE twf_node SET is_active = 'N' WHERE node_id = ?`, [nodesToRemove[0]]);
                         }
                     }
                     if (flowIdDel.action.actionType.name === 'CHAINED FLOW') {
@@ -842,7 +834,7 @@ let Flow = class Flow extends core_1.Controller {
         const applyDynamicFilters = (queryBuilder, filters, logicOperator) => {
             filters.forEach((filter, index) => {
                 const { field, operator, value } = filter;
-                const queryField = `f.${field}`;
+                const queryField = `f.${(0, flowFilter_1.flowFilterColumn)(field)}`;
                 const parameterName = `filterValue${index}`;
                 let condition;
                 switch (operator) {
@@ -1006,7 +998,7 @@ let Flow = class Flow extends core_1.Controller {
         const applyDynamicFilters = (queryBuilder, filters, logicOperator) => {
             filters.forEach((filter, index) => {
                 const { field, operator, value } = filter;
-                const queryField = `f.${field}`;
+                const queryField = `f.${(0, flowFilter_1.flowFilterColumn)(field)}`;
                 const parameterName = `filterValue${index}`;
                 let condition;
                 switch (operator) {

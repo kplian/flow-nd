@@ -129,6 +129,60 @@ describe('event and node instance queries', () => {
     expect(query.mock.calls[0][1]).toEqual(['1 UNION SELECT 1']);
     expect(query.mock.calls[0][0]).not.toContain('evil');
   });
+
+  it('RecursiveInstance uses the instance origin when origin_name is null and origin_key is empty', async () => {
+    const { query } = queryManager();
+    const ctrl = new NodeInstanceController('flow-nd', NodeInstanceModel, pxpConfig);
+    await ctrl.RecursiveInstance({
+      node: {
+        nodeId: 3,
+        actionConfigJson: '',
+        action: {
+          originName: null,
+          originKey: '',
+          configJsonTemplate: '',
+          actionType: { isDelay: 'N', controller: '' },
+        },
+      },
+      flowInstance: {
+        flowInstanceId: 8,
+        originName: 'v_volunteer_need_review_items',
+        originKey: 'uuid',
+        dataId: 15,
+      },
+    }, { save: jest.fn() } as any);
+    expect(query.mock.calls[0][0]).toBe(
+      'SELECT * FROM `v_volunteer_need_review_items` WHERE `uuid` = ?',
+    );
+    expect(query.mock.calls[0][1]).toEqual([15]);
+  });
+
+  it('RecursiveInstance uses the instance origin when the action origin is blank', async () => {
+    const { query } = queryManager();
+    const ctrl = new NodeInstanceController('flow-nd', NodeInstanceModel, pxpConfig);
+    await ctrl.RecursiveInstance({
+      node: {
+        nodeId: 3,
+        actionConfigJson: '',
+        action: {
+          originName: '',
+          originKey: '',
+          configJsonTemplate: '',
+          actionType: { isDelay: 'N', controller: '' },
+        },
+      },
+      flowInstance: {
+        flowInstanceId: 8,
+        originName: 'v_volunteer_need_review_items',
+        originKey: 'uuid',
+        dataId: 15,
+      },
+    }, { save: jest.fn() } as any);
+    expect(query.mock.calls[0][0]).toBe(
+      'SELECT * FROM `v_volunteer_need_review_items` WHERE `uuid` = ?',
+    );
+    expect(query.mock.calls[0][1]).toEqual([15]);
+  });
 });
 
 describe('getParameterizedNode vendor', () => {

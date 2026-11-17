@@ -9,17 +9,11 @@
  * Date Change      ID              Author              Description
  * -----------      -----------     --------------      ------------------------------------
  * 10-Nov-2026                      Rensi Arteaga       Created
- * 16-Nov-2026                      Rensi Arteaga       Blank action origin falls back to the instance
  ******************************************************************************/
 
 import { PxpError } from '@pxp-nd/core';
 
 const SQL_IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-export function originOrFallback(actionValue: unknown, instanceValue: unknown): unknown {
-  const text = String(actionValue ?? '').trim();
-  return text === '' ? instanceValue : actionValue;
-}
 
 export function sqlIdent(value: unknown): string {
   const ident = String(value ?? '');

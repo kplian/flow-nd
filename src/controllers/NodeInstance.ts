@@ -15,6 +15,7 @@
  *  25-Apr-2025   8914754251     Mercedes Zambrana   Validate and use node?.action?.controllerFunction
  *  08-Oct-2026   EF-23          Favio Figueroa      GET_LOCK instead of flag, skipped=200, axios timeout
  *  16-Nov-2026                  Rensi Arteaga       Blank action origin uses the flow instance origin
+ *  17-Nov-2026                  Rensi Arteaga       Empty origin_key falls back with ||, not ??
  */
 
 import { EntityManager, getManager } from "typeorm";
@@ -41,7 +42,7 @@ import Action from "../entity/Action";
 import _ from "lodash";
 import FlowInstance from "../entity/FlowInstance";
 import { withDbLock } from "../helpers/dbLock";
-import { originOrFallback, selectByIdent } from "../helpers/sqlIdent";
+import { selectByIdent } from "../helpers/sqlIdent";
 
 //TODO replace this flow-nd need tobe independent library
 import { GlobalData } from "@pxp-nd/common";
@@ -55,8 +56,8 @@ class NodeInstance extends Controller {
     const { node, flowInstance, eventNode } = params;
 
     try {
-      const originName = originOrFallback(node?.action?.originName, flowInstance.originName);
-      const originKey = originOrFallback(node?.action?.originKey, flowInstance.originKey);
+      const originName = node?.action?.originName || flowInstance.originName;
+      const originKey = node?.action?.originKey || flowInstance.originKey;
       const resExecuteView = await __(selectByIdent(getManager(), originName, originKey, flowInstance.dataId));
       const resultFromOrigin = resExecuteView[0];
 
